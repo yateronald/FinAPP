@@ -1,0 +1,41 @@
+version: '3.9'
+
+# Local development stack. In production, point DATABASE_URL at Aiven PostgreSQL
+# and you can drop the `postgres` service below.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: finapp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: finapp
+      POSTGRES_PASSWORD: finapp
+      POSTGRES_DB: finapp
+    ports:
+      - '5432:5432'
+    volumes:
+      - finapp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U finapp']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: finapp-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://finapp:finapp@postgres:5432/finapp?schema=public
+    env_file:
+      - ./backend/.env
+    ports:
+      - '4000:4000'
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+
+volumes:
+  finapp_pgdata:

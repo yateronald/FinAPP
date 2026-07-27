@@ -1,0 +1,50 @@
+import {
+  BookOpen,
+  Briefcase,
+  Car,
+  Circle,
+  Film,
+  Gift,
+  HandHeart,
+  HeartPulse,
+  Home,
+  Laptop,
+  Plane,
+  Receipt,
+  RotateCcw,
+  ShoppingBag,
+  TrendingUp,
+  Users,
+  Utensils,
+  Wallet,
+  Wifi,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react';
+
+const iconMap: Record<string, LucideIcon> = {
+  wallet: Wallet,
+  laptop: Laptop,
+  briefcase: Briefcase,
+  gift: Gift,
+  'trending-up': TrendingUp,
+  'rotate-ccw': RotateCcw,
+  home: Home,
+  utensils: Utensils,
+  car: Car,
+  'shopping-bag': ShoppingBag,
+  wifi: Wifi,
+  zap: Zap,
+  film: Film,
+  'book-open': BookOpen,
+  'heart-pulse': HeartPulse,
+  plane: Plane,
+  users: Users,
+  'hand-heart': HandHeart,
+  receipt: Receipt,
+  circle: Circle,
+};
+
+export function categoryIcon(name?: string | null): LucideIcon {
+  return (name && iconMap[name]) || Circle;
+}

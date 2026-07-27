@@ -1,0 +1,72 @@
+
+> fintrack-web@1.0.0 dev
+> next dev
+
+   ▲ Next.js 15.0.3
+   - Local:        http://localhost:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.4s
+ ○ Compiling /settings ...
+ ✓ Compiled /settings in 1593ms (1170 modules)
+ GET /settings 200 in 2214ms
+ GET /settings 200 in 33ms
+ ✓ Compiled in 1756ms (1184 modules)
+ GET /settings 200 in 78ms
+ GET /settings 200 in 662ms
+ ✓ Compiled in 518ms (1182 modules)
+ GET /settings 200 in 76ms
+ ✓ Compiled in 306ms (1182 modules)
+ GET /settings 200 in 45ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1381ms (2323 modules)
+ GET /dashboard 200 in 1649ms
+ ○ Compiling /income ...
+ ✓ Compiled /income in 4.4s (2384 modules)
+ GET /income 200 in 4835ms
+ GET /dashboard 200 in 37ms
+ ○ Compiling /ai ...
+ ✓ Compiled /ai in 5.5s (2980 modules)
+ GET /ai 200 in 6195ms
+ GET /dashboard 200 in 88ms
+ POST /dashboard 200 in 97ms
+ GET /dashboard 200 in 732ms
+ GET /ai 200 in 74ms
+ GET /income 200 in 145ms
+ ○ Compiling /expenses ...
+ ✓ Compiled /expenses in 5.1s (2995 modules)
+ GET /expenses 200 in 5475ms
+ GET /expenses 200 in 66ms
+ GET /ai 200 in 94ms
+ GET /ai 200 in 458ms
+ GET /ai 200 in 36ms
+ GET /ai 200 in 25ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 4.3s (2998 modules)
+ GET /en/contact 404 in 4686ms
+ GET /ai 200 in 390ms
+ ✓ Compiled in 1554ms (2995 modules)
+ ✓ Compiled in 1195ms (3017 modules)
+ ✓ Compiled in 425ms (3017 modules)
+ ✓ Compiled in 682ms (3017 modules)
+ ✓ Compiled in 692ms (3017 modules)
+ ✓ Compiled in 265ms (1446 modules)
+ ✓ Compiled in 1004ms (3017 modules)
+ ✓ Compiled in 225ms (1446 modules)
+ ✓ Compiled in 920ms (3017 modules)
+ ✓ Compiled in 430ms (3017 modules)
+ ✓ Compiled in 631ms (3017 modules)
+ ✓ Compiled in 286ms (1571 modules)
+ ✓ Compiled in 178ms (1571 modules)
+ ✓ Compiled in 15.9s (3017 modules)
+ ✓ Compiled in 4.7s (3017 modules)
+ ✓ Compiled in 5.2s (3017 modules)
+ ✓ Compiled in 8s (3017 modules)
+ ✓ Compiled in 1349ms (1571 modules)
+ ✓ Compiled in 1416ms (1571 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 3.2s (3022 modules)
+ GET / 307 in 4273ms
+ GET /dashboard 200 in 1258ms
+ ✓ Compiled in 2.1s (1447 modules)
