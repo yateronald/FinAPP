@@ -21,9 +21,14 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     done: VerifyCallback,
   ) {
     const { id, name, emails, photos } = profile;
+    const primary = emails?.[0];
     const user = {
       googleId: id,
-      email: emails?.[0]?.value,
+      email: primary?.value,
+      // Accounts are linked by email, so an unverified address would let a
+      // stranger claim someone else's account. Passed through and enforced in
+      // resolveGoogleAccount.
+      emailVerified: (primary as { verified?: boolean | string } | undefined)?.verified !== false,
       firstName: name?.givenName,
       lastName: name?.familyName,
       avatarUrl: photos?.[0]?.value,

@@ -6,7 +6,16 @@ import 'api_config.dart';
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
-  ApiException(this.message, [this.statusCode]);
+
+  /// Machine-readable reason from the backend (e.g. ACCOUNT_NOT_FOUND,
+  /// ACCOUNT_EXISTS, PASSWORD_CHANGE_REQUIRED). Lets callers branch on the
+  /// cause instead of pattern-matching human-readable text.
+  final String? code;
+
+  /// Extra context some errors carry — currently the email involved.
+  final String? email;
+
+  ApiException(this.message, [this.statusCode, this.code, this.email]);
   @override
   String toString() => message;
 }
@@ -106,7 +115,16 @@ class ApiClient {
         e.type == DioExceptionType.sendTimeout) {
       message = 'Le serveur met trop de temps à répondre. Réessayez.';
     }
-    return ApiException(message, e.response?.statusCode);
+    // The backend attaches `code` (and sometimes `email`) to errors the UI has
+    // to react to differently — losing them here would force brittle string
+    // matching on the message.
+    String? code;
+    String? email;
+    if (data is Map) {
+      code = data['code'] as String?;
+      email = data['email'] as String?;
+    }
+    return ApiException(message, e.response?.statusCode, code, email);
   }
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query, bool auth = true}) async {

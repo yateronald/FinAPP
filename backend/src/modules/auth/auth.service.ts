@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { Language, OtpPurpose, Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { randomInt } from 'crypto';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   ALL_DEFAULT_CATEGORIES,
@@ -212,12 +213,26 @@ export class AuthService {
     return { message: 'Password reset successful. Please log in.' };
   }
 
+  /**
+   * Changes the password — or sets the first one.
+   *
+   * An account created through Google has no passwordHash, so there is no
+   * current password to confirm. Requiring one would leave those users unable
+   * to ever add a password. Setting one does NOT unlink Google: both sign-in
+   * methods keep working afterwards.
+   */
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.passwordHash) throw new BadRequestException('Invalid request');
+    if (!user) throw new BadRequestException('Invalid request');
 
-    const valid = await this.tokens.verifyPassword(user.passwordHash, currentPassword);
-    if (!valid) throw new BadRequestException('Current password is incorrect');
+    const settingFirstPassword = !user.passwordHash;
+    if (!settingFirstPassword) {
+      if (!currentPassword) {
+        throw new BadRequestException('Current password is required');
+      }
+      const valid = await this.tokens.verifyPassword(user.passwordHash!, currentPassword);
+      if (!valid) throw new BadRequestException('Current password is incorrect');
+    }
 
     const passwordHash = await this.tokens.hashPassword(newPassword);
     await this.prisma.user.update({
@@ -226,31 +241,85 @@ export class AuthService {
       data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() },
     });
     await this.tokens.revokeAllForUser(userId);
-    await this.audit.log({ userId, action: 'PASSWORD_CHANGED', entity: 'User', entityId: userId });
+    await this.audit.log({
+      userId,
+      action: settingFirstPassword ? 'PASSWORD_SET' : 'PASSWORD_CHANGED',
+      entity: 'User',
+      entityId: userId,
+    });
 
-    return { message: 'Password changed. Please log in again.' };
+    return {
+      message: settingFirstPassword
+        ? 'Password set. You can now sign in with your email or with Google.'
+        : 'Password changed. Please log in again.',
+      wasFirstPassword: settingFirstPassword,
+    };
   }
 
   // ------------------------------------------------------------ Google login
-  async validateGoogleUser(profile: {
-    googleId: string;
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    avatarUrl?: string;
-  }) {
-    let user = await this.prisma.user.findFirst({
-      where: { OR: [{ googleId: profile.googleId }, { email: profile.email }] },
+  /**
+   * Resolves a Google profile to an account, honouring what the user asked for.
+   *
+   * Silently creating an account on "Sign in" hides a typo'd address behind a
+   * brand-new empty account; silently signing in on "Sign up" hides that they
+   * already have one. Both cases now report back instead.
+   */
+  async resolveGoogleAccount(
+    profile: {
+      googleId: string;
+      email: string;
+      emailVerified?: boolean;
+      firstName?: string;
+      lastName?: string;
+      avatarUrl?: string;
+    },
+    intent: 'signin' | 'signup' = 'signin',
+  ) {
+    // Accounts are matched on email, so an unverified Google address would let
+    // anyone claim someone else's account by registering that address with
+    // Google. Google sets this true for real mailboxes.
+    if (profile.emailVerified === false) {
+      throw new BadRequestException({
+        message: 'Your Google email address is not verified.',
+        code: 'GOOGLE_EMAIL_UNVERIFIED',
+      });
+    }
+
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ googleId: profile.googleId }, { email: profile.email }],
+        deletedAt: null,
+      },
     });
 
-    if (!user) {
-      user = await this.prisma.user.create({
+    if (intent === 'signup' && existing) {
+      throw new ConflictException({
+        message: 'An account already exists for this email. Sign in instead.',
+        code: 'ACCOUNT_EXISTS',
+        email: existing.email,
+        // Tells the client whether "Sign in with Google" will work, or whether
+        // they registered with a password and should use that.
+        hasGoogle: !!existing.googleId,
+      });
+    }
+
+    if (intent === 'signin' && !existing) {
+      throw new UnauthorizedException({
+        message: 'No account found for this Google address. Please sign up first.',
+        code: 'ACCOUNT_NOT_FOUND',
+        email: profile.email,
+      });
+    }
+
+    if (!existing) {
+      return this.prisma.user.create({
         data: {
           email: profile.email,
           googleId: profile.googleId,
           firstName: profile.firstName,
           lastName: profile.lastName,
           avatarUrl: profile.avatarUrl,
+          // Google already proved ownership of the mailbox.
           emailVerified: true,
           settings: {
             create: { currency: this.config.get<string>('defaultCurrency') ?? 'XOF' },
@@ -267,18 +336,105 @@ export class AuthService {
           },
         },
       });
-    } else if (!user.googleId) {
-      user = await this.prisma.user.update({
-        where: { id: user.id },
-        data: { googleId: profile.googleId, emailVerified: true },
+    }
+
+    if (!existing.isActive) {
+      throw new UnauthorizedException({
+        message: 'Account is disabled',
+        code: 'ACCOUNT_DISABLED',
       });
     }
 
-    return user;
+    // Existing account signing in: link the Google identity the first time and
+    // backfill only fields the user has not set themselves.
+    const patch: Record<string, unknown> = {};
+    if (!existing.googleId) {
+      patch.googleId = profile.googleId;
+      patch.emailVerified = true;
+    }
+    if (!existing.firstName && profile.firstName) patch.firstName = profile.firstName;
+    if (!existing.lastName && profile.lastName) patch.lastName = profile.lastName;
+    if (!existing.avatarUrl && profile.avatarUrl) patch.avatarUrl = profile.avatarUrl;
+
+    if (Object.keys(patch).length === 0) return existing;
+    return this.prisma.user.update({ where: { id: existing.id }, data: patch });
   }
 
-  async loginWithOAuthUser(userId: string, email: string, role: any, device: DeviceContext) {
+  /** @deprecated use resolveGoogleAccount — kept for the web redirect flow. */
+  async validateGoogleUser(profile: {
+    googleId: string;
+    email: string;
+    emailVerified?: boolean;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+  }) {
+    return this.resolveGoogleAccount(profile, 'signin');
+  }
+
+  async loginWithOAuthUser(
+    userId: string,
+    email: string,
+    role: any,
+    device: DeviceContext,
+  ) {
+    // Same rule as password login: the mobile app has no admin UI, so an admin
+    // signing in there would be stranded.
+    if (role === 'ADMIN' && device.clientType === 'mobile') {
+      throw new UnauthorizedException(
+        'Admin accounts must sign in on the web dashboard.',
+      );
+    }
     return this.completeLogin(userId, email, role, device);
+  }
+
+  /**
+   * Verifies a Google ID token issued to our own client and signs the user in.
+   * This is the native-app path: `google_sign_in` obtains the token on-device,
+   * so no browser redirect is involved.
+   */
+  async googleTokenLogin(
+    idToken: string,
+    intent: 'signin' | 'signup',
+    device: DeviceContext,
+  ) {
+    const clientId = this.config.get<string>('google.clientId');
+    if (!clientId) {
+      throw new BadRequestException('Google sign-in is not configured on this server.');
+    }
+
+    let payload: TokenPayload | undefined;
+    try {
+      const client = new OAuth2Client(clientId);
+      const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+      payload = ticket.getPayload();
+    } catch (e) {
+      throw new UnauthorizedException({
+        message: 'Invalid Google token.',
+        code: 'GOOGLE_TOKEN_INVALID',
+      });
+    }
+
+    if (!payload?.sub || !payload.email) {
+      throw new UnauthorizedException({
+        message: 'Google token is missing the account email.',
+        code: 'GOOGLE_TOKEN_INVALID',
+      });
+    }
+
+    const user = await this.resolveGoogleAccount(
+      {
+        googleId: payload.sub,
+        email: payload.email,
+        emailVerified: payload.email_verified,
+        firstName: payload.given_name,
+        lastName: payload.family_name,
+        avatarUrl: payload.picture,
+      },
+      intent,
+    );
+
+    return this.loginWithOAuthUser(user.id, user.email, user.role, device);
   }
 
   // ------------------------------------------------------------------ Logout

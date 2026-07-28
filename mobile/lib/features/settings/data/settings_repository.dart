@@ -14,9 +14,15 @@ class SettingsRepository {
     });
   }
 
-  Future<void> changePassword(String currentPassword, String newPassword) async {
+  /// Changes the password, or sets the first one.
+  ///
+  /// Google-created accounts have no password to confirm, so
+  /// [currentPassword] is omitted entirely rather than sent empty — the
+  /// backend distinguishes the two cases.
+  Future<void> changePassword(String? currentPassword, String newPassword) async {
     await _api.post('/auth/change-password', body: {
-      'currentPassword': currentPassword,
+      if (currentPassword != null && currentPassword.isNotEmpty)
+        'currentPassword': currentPassword,
       'newPassword': newPassword,
     });
   }

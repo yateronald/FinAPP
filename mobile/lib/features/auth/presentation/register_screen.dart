@@ -11,6 +11,7 @@ import '../../../core/theme/responsive.dart';
 import '../data/user_model.dart';
 import '../providers/auth_provider.dart';
 import 'auth_widgets.dart';
+import 'google_auth_button.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -368,6 +369,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       const SizedBox(height: 22),
                       AuthPrimaryButton(
                           label: t.createMyAccount, loading: _loading, onTap: _submit),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: context.borderColor)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(t.orSeparator,
+                                style: TextStyle(color: context.muted, fontSize: 12.5)),
+                          ),
+                          Expanded(child: Divider(color: context.borderColor)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      const GoogleAuthButton(intent: 'signup'),
                       const SizedBox(height: 14),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,

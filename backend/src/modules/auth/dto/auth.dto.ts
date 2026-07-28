@@ -1,7 +1,8 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   Length,
@@ -109,13 +110,33 @@ export class RefreshTokenDto {
 }
 
 export class ChangePasswordDto {
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description:
+      'Required when the account already has a password. Omit when setting the first one (Google-created accounts).',
+  })
+  @IsOptional()
   @IsString()
-  currentPassword: string;
+  currentPassword?: string;
 
   @ApiProperty({ minLength: 8 })
   @IsString()
   @MinLength(8)
   @MaxLength(72)
   newPassword: string;
+}
+
+export class GoogleTokenDto {
+  @ApiProperty({ description: 'Google ID token obtained on-device by google_sign_in' })
+  @IsString()
+  idToken: string;
+
+  @ApiPropertyOptional({
+    enum: ['signin', 'signup'],
+    default: 'signin',
+    description:
+      'signin fails when no account exists; signup fails when one already does.',
+  })
+  @IsOptional()
+  @IsIn(['signin', 'signup'])
+  intent?: 'signin' | 'signup';
 }

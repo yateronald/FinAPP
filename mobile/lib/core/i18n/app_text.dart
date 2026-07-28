@@ -451,6 +451,48 @@ class AppText {
         'Set a budget per category to receive AI recommendations.',
       );
 
+  // ------------------------------------------------------ Google sign-in
+  String get signUpWithGoogle =>
+      _s('S’inscrire avec Google', 'Sign up with Google');
+  String get orSeparator => _s('ou', 'or');
+  String get googleNoAccountTitle =>
+      _s('Aucun compte trouvé', 'No account found');
+  String googleNoAccountBody(String email) => _s(
+        'Aucun compte n’existe pour $email. Créez-en un — vous pourrez aussi '
+            'vous inscrire avec Google.',
+        'There is no account for $email yet. Create one — you can sign up with '
+            'Google too.',
+      );
+  String get googleNoAccountCta => _s('Créer un compte', 'Create an account');
+  String get googleAccountExistsTitle =>
+      _s('Compte déjà existant', 'Account already exists');
+  String googleAccountExistsBody(String email) => _s(
+        'Un compte existe déjà pour $email. Connectez-vous à la place.',
+        'An account already exists for $email. Sign in instead.',
+      );
+  String get googleAccountExistsCta => _s('Se connecter', 'Sign in');
+  String get googleUnavailable => _s(
+        'Google Sign-In n’est pas disponible sur cet appareil.',
+        'Google Sign-In is not available on this device.',
+      );
+  String get googleEmailUnverified => _s(
+        'Votre adresse Google n’est pas vérifiée.',
+        'Your Google email address is not verified.',
+      );
+
+  // ------------------------------------------------- Password / Google mix
+  String get setPassword => _s('Définir un mot de passe', 'Set a password');
+  String get setPasswordSubtitle => _s(
+        'Votre compte utilise Google. Ajoutez un mot de passe pour pouvoir '
+            'aussi vous connecter par e-mail — Google continuera de fonctionner.',
+        'Your account uses Google. Add a password so you can also sign in with '
+            'your email — Google keeps working either way.',
+      );
+  String get passwordSetDone => _s(
+        'Mot de passe défini. Vous pouvez vous connecter par e-mail ou avec Google.',
+        'Password set. You can sign in with your email or with Google.',
+      );
+
   // --------------------------------------------- AI forecast data gate
   String get forecastNeedsDataTitle =>
       _s('Prévisions bientôt disponibles', 'Forecast not available yet');

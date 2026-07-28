@@ -206,7 +206,14 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: biometric ? t.biometricOnEach : t.biometricProtect(bioLabel),
           ),
           _divider(context),
-          _navTile(context, Icons.lock_outline_rounded, t.changePassword,
+          // Google-created accounts have no password yet — offer to set one
+          // rather than to change something that does not exist.
+          _navTile(
+              context,
+              Icons.lock_outline_rounded,
+              (ref.watch(authProvider).user?.hasPassword ?? true)
+                  ? t.changePassword
+                  : t.setPassword,
               () => showChangePasswordSheet(context)),
           _divider(context),
           ListTile(

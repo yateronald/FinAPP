@@ -24,6 +24,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // Stable machine-readable code (e.g. PASSWORD_CHANGE_REQUIRED) so clients
     // branch on this instead of matching translatable message text.
     let code: string | undefined;
+    // Extra context an error may carry so the UI can be specific — e.g. which
+    // address ACCOUNT_NOT_FOUND refers to, and whether that account has Google
+    // linked. Never anything sensitive.
+    let email: string | undefined;
+    let hasGoogle: boolean | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -34,6 +39,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = (res as any).message ?? message;
         error = (res as any).error ?? exception.name;
         code = (res as any).code;
+        email = (res as any).email;
+        hasGoogle = (res as any).hasGoogle;
       }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       const mapped = this.mapPrismaError(exception);
@@ -57,6 +64,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error,
       message,
       ...(code ? { code } : {}),
+      ...(email ? { email } : {}),
+      ...(hasGoogle !== undefined ? { hasGoogle } : {}),
       path: request.url,
       timestamp: new Date().toISOString(),
     });

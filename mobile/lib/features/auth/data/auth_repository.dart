@@ -45,6 +45,24 @@ class AuthRepository {
     return map;
   }
 
+  /// Exchanges a Google ID token for a Fynexa session.
+  ///
+  /// [intent] must match what the user pressed: `signin` fails when no account
+  /// exists, `signup` fails when one already does. The backend reports those
+  /// as ACCOUNT_NOT_FOUND / ACCOUNT_EXISTS so the UI can explain what to do.
+  Future<AppUser> googleAuth({
+    required String idToken,
+    required String intent,
+  }) async {
+    final data = await _api.post('/auth/google/token',
+        body: {'idToken': idToken, 'intent': intent}, auth: false);
+    await SecureStorage.instance.saveTokens(
+      access: data['accessToken'],
+      refresh: data['refreshToken'],
+    );
+    return AppUser.fromJson(Map<String, dynamic>.from(data['user']));
+  }
+
   Future<AppUser> verifyEmail(String email, String code) async {
     final data = await _api
         .post('/auth/verify-email', body: {'email': email, 'code': code}, auth: false);

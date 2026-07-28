@@ -4,6 +4,7 @@ import '../../../core/i18n/app_text.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 
 Future<void> showChangePasswordSheet(BuildContext context) {
@@ -27,6 +28,9 @@ class _ChangePasswordSheetState extends ConsumerState<ChangePasswordSheet> {
   final _next = TextEditingController();
   final _confirm = TextEditingController();
   bool _saving = false;
+
+  /// True when the account has no password yet (created via Google).
+  bool get _settingFirst => !(ref.read(authProvider).user?.hasPassword ?? true);
   bool _obscure = true;
   String? _error;
 
@@ -45,7 +49,13 @@ class _ChangePasswordSheetState extends ConsumerState<ChangePasswordSheet> {
       _error = null;
     });
     try {
-      await ref.read(settingsRepositoryProvider).changePassword(_current.text, _next.text);
+      final firstTime = !(ref.read(authProvider).user?.hasPassword ?? true);
+      await ref
+          .read(settingsRepositoryProvider)
+          .changePassword(firstTime ? null : _current.text, _next.text);
+      // The account now has a password too — refresh so Settings stops
+      // offering "Set a password".
+      await ref.read(authProvider.notifier).refreshUser();
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -84,9 +94,16 @@ class _ChangePasswordSheetState extends ConsumerState<ChangePasswordSheet> {
                 ),
               ),
               const SizedBox(height: 18),
-              Text(context.t.changePassword,
+              Text(_settingFirst ? context.t.setPassword : context.t.changePassword,
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              if (_settingFirst) ...[
+                const SizedBox(height: 8),
+                Text(context.t.setPasswordSubtitle,
+                    style: TextStyle(fontSize: 12.5, height: 1.4, color: context.muted)),
+              ],
               const SizedBox(height: 18),
+              // A Google-created account has no current password to confirm.
+              if (!_settingFirst)
               TextFormField(
                 controller: _current,
                 obscureText: _obscure,
@@ -99,7 +116,7 @@ class _ChangePasswordSheetState extends ConsumerState<ChangePasswordSheet> {
                 ),
                 validator: (v) => (v == null || v.isEmpty) ? context.t.required : null,
               ),
-              const SizedBox(height: 14),
+              if (!_settingFirst) const SizedBox(height: 14),
               TextFormField(
                 controller: _next,
                 obscureText: _obscure,

@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import 'auth_widgets.dart';
+import 'google_auth_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -252,7 +253,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ],
                         ),
                         const SizedBox(height: 14),
-                        const SocialButtons(),
+                        const GoogleAuthButton(intent: 'signin'),
                         const SizedBox(height: 14),
                         _SecurityBanner(text: t.bankGrade),
                         const SizedBox(height: 6),

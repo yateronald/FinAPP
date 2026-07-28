@@ -43,6 +43,12 @@ class AppUser {
   final bool emailVerified;
   final UserSettings? settings;
 
+  /// Which sign-in methods this account has. Google-created accounts start
+  /// with no password, so Settings must offer "Set a password" rather than
+  /// "Change password" (there is nothing to confirm against).
+  final bool hasPassword;
+  final bool hasGoogle;
+
   AppUser({
     required this.id,
     required this.email,
@@ -51,6 +57,8 @@ class AppUser {
     this.avatarUrl,
     this.emailVerified = false,
     this.settings,
+    this.hasPassword = true,
+    this.hasGoogle = false,
   });
 
   String get displayName {
@@ -75,5 +83,9 @@ class AppUser {
         settings: j['settings'] != null
             ? UserSettings.fromJson(Map<String, dynamic>.from(j['settings']))
             : null,
+        // Only /users/me carries these. Elsewhere (login response) default to
+        // "has a password" so we never wrongly hide the current-password field.
+        hasPassword: j['hasPassword'] ?? true,
+        hasGoogle: j['hasGoogle'] ?? false,
       );
 }

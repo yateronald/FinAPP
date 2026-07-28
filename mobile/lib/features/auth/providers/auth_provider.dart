@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../data/auth_repository.dart';
+import '../data/google_auth_service.dart';
 import '../data/user_model.dart';
 
 enum AuthStatus { unknown, unauthenticated, authenticated }
@@ -89,6 +90,9 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> logout() async {
     await _repo.logout();
+    // Clear the cached Google session too, otherwise the next sign-in silently
+    // reuses the same account and switching users becomes impossible.
+    await GoogleAuthService.instance.signOut();
     state = const AuthState(AuthStatus.unauthenticated);
   }
 }

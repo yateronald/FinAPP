@@ -25,6 +25,7 @@ import {
   ForgotPasswordDto,
   LoginDto,
   RefreshTokenDto,
+  GoogleTokenDto,
   RegisterDto,
   ResendOtpDto,
   ResetPasswordDto,
@@ -171,7 +172,7 @@ export class AuthController {
     @CurrentUser('userId') userId: string,
     @Body() dto: ChangePasswordDto,
   ) {
-    return this.auth.changePassword(userId, dto.currentPassword, dto.newPassword);
+    return this.auth.changePassword(userId, dto.currentPassword ?? '', dto.newPassword);
   }
 
   @Get('sessions')
@@ -192,26 +193,59 @@ export class AuthController {
   @Public()
   @Get('google')
   @UseGuards(GoogleAuthGuard)
-  @ApiOperation({ summary: 'Start Google OAuth flow' })
+  @ApiOperation({
+    summary: 'Start Google OAuth flow (web)',
+    description: 'Pass ?intent=signup to require a new account, ?intent=signin to require an existing one.',
+  })
   async googleAuth() {
-    // Guard redirects to Google.
+    // Guard redirects to Google. `intent` rides along in `state`.
   }
 
   @Public()
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
-  @ApiOperation({ summary: 'Google OAuth callback' })
+  @ApiOperation({ summary: 'Google OAuth callback (web)' })
   async googleCallback(@Req() req: Request, @Res() res: Response) {
-    const profile = req.user as any;
-    const user = await this.auth.validateGoogleUser(profile);
-    const result = await this.auth.loginWithOAuthUser(
-      user.id,
-      user.email,
-      user.role,
+    const webUrl = this.config.get<string>('webAppUrl') || '';
+    const intent = (req.query.state as string) === 'signup' ? 'signup' : 'signin';
+
+    try {
+      const profile = req.user as any;
+      const user = await this.auth.resolveGoogleAccount(profile, intent);
+      const result = await this.auth.loginWithOAuthUser(
+        user.id,
+        user.email,
+        user.role,
+        this.deviceOf(req),
+      );
+      this.setRefreshCookie(res, result.refreshToken);
+      return res.redirect(`${webUrl}/auth/callback?token=${result.accessToken}`);
+    } catch (e: any) {
+      // Redirect back with a machine-readable reason so the sign-in page can
+      // say "you don't have an account yet" instead of showing a raw 401.
+      const body = e?.response ?? {};
+      const code = body.code ?? 'GOOGLE_SIGNIN_FAILED';
+      const params = new URLSearchParams({ error: code });
+      if (body.email) params.set('email', body.email);
+      const target = intent === 'signup' ? 'register' : 'login';
+      return res.redirect(`${webUrl}/${target}?${params.toString()}`);
+    }
+  }
+
+  @Public()
+  @Post('google/token')
+  @ApiOperation({
+    summary: 'Sign in / sign up with a Google ID token (mobile)',
+    description:
+      'Native apps obtain the ID token on-device via google_sign_in. Returns the same session as password login.',
+  })
+  async googleToken(@Body() dto: GoogleTokenDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await this.auth.googleTokenLogin(
+      dto.idToken,
+      dto.intent ?? 'signin',
       this.deviceOf(req),
     );
     this.setRefreshCookie(res, result.refreshToken);
-    const webUrl = this.config.get<string>('webAppUrl');
-    res.redirect(`${webUrl}/auth/callback?token=${result.accessToken}`);
+    return result;
   }
 }

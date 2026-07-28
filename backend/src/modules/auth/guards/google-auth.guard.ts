@@ -17,4 +17,15 @@ export class GoogleAuthGuard extends AuthGuard('google') {
     ]);
     return super.canActivate(context);
   }
+
+  /**
+   * Carry the caller's intent through Google in the OAuth `state` parameter,
+   * so the callback knows whether the user pressed "Sign in" or "Sign up".
+   * Google echoes `state` back verbatim.
+   */
+  getAuthenticateOptions(context: ExecutionContext) {
+    const req = context.switchToHttp().getRequest();
+    const intent = req.query?.intent === 'signup' ? 'signup' : 'signin';
+    return { state: intent };
+  }
 }

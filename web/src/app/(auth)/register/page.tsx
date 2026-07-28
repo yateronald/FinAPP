@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRegister } from '@/hooks/use-auth';
+import { GoogleAuthButton, GoogleAuthError } from '@/components/auth/google-auth';
 
 const schema = z.object({
   firstName: z.string().min(1),
@@ -55,6 +56,11 @@ export default function RegisterPage() {
       <h1 className="text-2xl font-bold text-foreground">{t('registerTitle')}</h1>
       <p className="mt-1 text-sm text-muted-foreground">{t('registerSubtitle')}</p>
 
+      {/* Explains a bounced Google redirect (e.g. the account already exists). */}
+      <div className="mt-6">
+        <GoogleAuthError />
+      </div>
+
       <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
@@ -83,6 +89,12 @@ export default function RegisterPage() {
           {t('register')}
         </Button>
       </form>
+
+      <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" /> {t('or')} <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <GoogleAuthButton intent="signup" label={t('continueWithGoogle')} />
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {t('haveAccount')}{' '}

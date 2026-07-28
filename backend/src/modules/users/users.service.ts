@@ -26,10 +26,17 @@ export class UsersService {
         createdAt: true,
         lastLoginAt: true,
         settings: true,
+        // Which sign-in methods this account has. The hashes and ids
+        // themselves never leave the server — only whether they exist, so the
+        // client can offer "Set a password" instead of "Change password".
+        passwordHash: true,
+        googleId: true,
       },
     });
     if (!user) throw new NotFoundException('User not found');
-    return user;
+
+    const { passwordHash, googleId, ...safe } = user;
+    return { ...safe, hasPassword: !!passwordHash, hasGoogle: !!googleId };
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLogin } from '@/hooks/use-auth';
-import { API_URL } from '@/lib/api';
+import { GoogleAuthButton, GoogleAuthError } from '@/components/auth/google-auth';
 
 const schema = z.object({
   email: z.string().email(),
@@ -39,7 +39,12 @@ export default function LoginPage() {
       <h1 className="text-2xl font-bold text-foreground">{t('loginTitle')}</h1>
       <p className="mt-1 text-sm text-muted-foreground">{t('loginSubtitle')}</p>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
+      {/* Explains a bounced Google redirect (e.g. no account yet). */}
+      <div className="mt-6">
+        <GoogleAuthError />
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-2 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">{t('email')}</Label>
           <Input id="email" type="email" placeholder="demo@finapp.local" {...register('email')} />
@@ -65,9 +70,7 @@ export default function LoginPage() {
         <span className="h-px flex-1 bg-border" /> {t('or')} <span className="h-px flex-1 bg-border" />
       </div>
 
-      <Button variant="outline" className="w-full" asChild>
-        <a href={`${API_URL}/auth/google`}>{t('continueWithGoogle')}</a>
-      </Button>
+      <GoogleAuthButton intent="signin" label={t('continueWithGoogle')} />
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {t('noAccount')}{' '}

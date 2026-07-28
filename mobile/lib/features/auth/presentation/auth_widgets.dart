@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/i18n/app_text.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -207,72 +206,3 @@ class AuthPrimaryButton extends StatelessWidget {
 }
 
 /// Full-width "Continue with Google" button (visual — shows a "coming soon" hint).
-class SocialButtons extends StatelessWidget {
-  const SocialButtons({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(context.t.comingSoon))),
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: 54,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: context.borderColor),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CustomPaint(painter: _GooglePainter()),
-            ),
-            const SizedBox(width: 10),
-            Text(context.t.continueWithGoogle,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Minimal multi-color "G" mark for Google.
-class _GooglePainter extends CustomPainter {
-  const _GooglePainter();
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final stroke = size.width * 0.22;
-    final r = (size.width - stroke) / 2;
-    final center = rect.center;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.butt;
-    final arcs = <(double, double, Color)>[
-      (-0.35, 1.15, const Color(0xFF4285F4)),
-      (2.1, 1.25, const Color(0xFF34A853)),
-      (3.35, 1.0, const Color(0xFFFBBC05)),
-      (4.4, 1.25, const Color(0xFFEA4335)),
-    ];
-    for (final (start, sweep, color) in arcs) {
-      paint.color = color;
-      canvas.drawArc(Rect.fromCircle(center: center, radius: r), start, sweep, false, paint);
-    }
-    // Cross-bar of the G.
-    final bar = Paint()..color = const Color(0xFF4285F4);
-    canvas.drawRect(
-      Rect.fromLTWH(center.dx, center.dy - stroke / 2, r + stroke / 2, stroke),
-      bar,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
