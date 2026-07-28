@@ -10,6 +10,119 @@ import '../../auth/providers/auth_provider.dart';
 import '../data/ai_models.dart';
 import '../providers/ai_providers.dart';
 
+/// Shown when there is too little history to forecast anything. States exactly
+/// what is missing rather than showing an empty prediction.
+class _NotEnoughDataCard extends StatelessWidget {
+  const _NotEnoughDataCard({required this.q});
+  final ForecastDataQuality q;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.auto_graph_rounded,
+                  color: AppColors.primary, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                t.forecastNeedsDataTitle,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Text(
+            t.forecastNeedsDataBody,
+            style: TextStyle(fontSize: 12.5, height: 1.4, color: context.muted),
+          ),
+          const SizedBox(height: 14),
+          _Requirement(
+            label: t.forecastMonthsProgress(q.monthsWithData, q.monthsRequired),
+            done: q.monthsWithData >= q.monthsRequired,
+          ),
+          const SizedBox(height: 6),
+          _Requirement(
+            label: t.forecastTxProgress(q.transactions, q.transactionsRequired),
+            done: q.transactions >= q.transactionsRequired,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Requirement extends StatelessWidget {
+  const _Requirement({required this.label, required this.done});
+  final String label;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Icon(
+        done ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+        size: 16,
+        color: done ? AppColors.success : context.muted,
+      ),
+      const SizedBox(width: 8),
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: done ? FontWeight.w600 : FontWeight.w500,
+          color: done ? context.colors.onSurface : context.muted,
+        ),
+      ),
+    ]);
+  }
+}
+
+/// Honest caveat when the models had only a couple of months to learn from.
+class _ConfidenceNote extends StatelessWidget {
+  const _ConfidenceNote({required this.q});
+  final ForecastDataQuality q;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(children: [
+        const Icon(Icons.info_outline_rounded, size: 15, color: AppColors.warning),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            t.forecastLowConfidence(q.monthsWithData),
+            style: const TextStyle(fontSize: 11.5, height: 1.35),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
 class ForecastPanel extends ConsumerWidget {
   const ForecastPanel({super.key});
 
@@ -33,15 +146,27 @@ class ForecastPanel extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
           children: [
+            // Too little history for a forecast to mean anything — say so
+            // instead of rendering zeroed charts and generic advice.
+            if (!f.dataQuality.hasEnoughData) ...[
+              _NotEnoughDataCard(q: f.dataQuality),
+              const SizedBox(height: 20),
+            ],
             _HorizonSelector(
               current: horizon,
               onSelect: (h) => ref.read(forecastHorizonProvider.notifier).set(h),
             ),
             const SizedBox(height: 16),
-            _ModelBadges(f: f),
-            const SizedBox(height: 16),
-            _OverviewGrid(o: f.overview, currency: currency),
-            const SizedBox(height: 20),
+            if (f.dataQuality.hasEnoughData) ...[
+              _ModelBadges(f: f),
+              if (f.dataQuality.confidence != 'high') ...[
+                const SizedBox(height: 8),
+                _ConfidenceNote(q: f.dataQuality),
+              ],
+              const SizedBox(height: 16),
+              _OverviewGrid(o: f.overview, currency: currency),
+              const SizedBox(height: 20),
+            ],
             if (f.cashflow.isNotEmpty) ...[
               _CashflowCard(points: f.cashflow, currency: currency),
               const SizedBox(height: 20),

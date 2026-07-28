@@ -1,0 +1,19 @@
+# Copy to `key.properties` (same folder) and fill in with your real values.
+#
+# `key.properties` and the .jks itself are gitignored — NEVER commit either.
+# Losing this keystore means you can never publish an update to an app already
+# installed from it; users would have to uninstall and reinstall, losing local
+# data. Keep an encrypted backup somewhere separate from this machine.
+#
+# Generate the keystore with (you will be prompted for the passwords).
+# PKCS12 is the industry-standard format; JKS is proprietary and deprecated,
+# and keytool warns about it:
+#   keytool -genkeypair -v -keystore upload-keystore.p12 -storetype PKCS12 \
+#           -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# storeFile is resolved relative to android/app/.
+
+storeFile=upload-keystore.p12
+storePassword=CHANGE_ME
+keyAlias=upload
+keyPassword=CHANGE_ME

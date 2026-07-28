@@ -106,6 +106,47 @@ class ForecastObjective {
         etaDate = j['etaDate'];
 }
 
+/// How much history the forecast is standing on. When [hasEnoughData] is false
+/// the backend returns no alerts, suggestions or objectives at all — the UI
+/// must show a call to action rather than an empty prediction.
+class ForecastDataQuality {
+  final bool hasEnoughData;
+  final int monthsWithData;
+  final int transactions;
+  final int monthsRequired;
+  final int transactionsRequired;
+
+  /// 'low' | 'medium' | 'high' — how many months the models had to learn from.
+  final String confidence;
+
+  const ForecastDataQuality({
+    required this.hasEnoughData,
+    required this.monthsWithData,
+    required this.transactions,
+    required this.monthsRequired,
+    required this.transactionsRequired,
+    required this.confidence,
+  });
+
+  int get missingMonths =>
+      (monthsRequired - monthsWithData).clamp(0, monthsRequired);
+  int get missingTransactions =>
+      (transactionsRequired - transactions).clamp(0, transactionsRequired);
+
+  factory ForecastDataQuality.fromJson(Map<String, dynamic> j) {
+    int i(dynamic v, [int d = 0]) => (v as num?)?.toInt() ?? d;
+    return ForecastDataQuality(
+      // Absent field = an older backend that always produced a forecast.
+      hasEnoughData: j['hasEnoughData'] as bool? ?? true,
+      monthsWithData: i(j['monthsWithData']),
+      transactions: i(j['transactions']),
+      monthsRequired: i(j['monthsRequired'], 2),
+      transactionsRequired: i(j['transactionsRequired'], 5),
+      confidence: j['confidence'] as String? ?? 'high',
+    );
+  }
+}
+
 class ForecastData {
   final int horizonDays;
   final ForecastModelInfo incomeModel, expenseModel;
@@ -115,6 +156,7 @@ class ForecastData {
   final List<ForecastAlert> alerts;
   final List<ForecastSuggestion> suggestions;
   final List<ForecastObjective> objectives;
+  final ForecastDataQuality dataQuality;
 
   ForecastData({
     required this.horizonDays,
@@ -126,6 +168,7 @@ class ForecastData {
     required this.alerts,
     required this.suggestions,
     required this.objectives,
+    required this.dataQuality,
   });
 
   factory ForecastData.fromJson(Map<String, dynamic> j) {
@@ -143,6 +186,8 @@ class ForecastData {
       alerts: mapList('alerts', ForecastAlert.fromJson),
       suggestions: mapList('suggestions', ForecastSuggestion.fromJson),
       objectives: mapList('objectives', ForecastObjective.fromJson),
+      dataQuality:
+          ForecastDataQuality.fromJson(Map<String, dynamic>.from(j['dataQuality'] ?? {})),
     );
   }
 }

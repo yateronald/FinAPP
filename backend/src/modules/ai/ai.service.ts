@@ -113,12 +113,96 @@ Budgets: ${
     return { question, answer, configured: this.llm.anyConfigured };
   }
 
+  /**
+   * Does this scope have anything worth analysing for the selected month?
+   *
+   * Without this the model is handed a context of all-zeros and dutifully
+   * invents advice about spending that never happened. Checking the same data
+   * the user sees on screen keeps the empty state honest.
+   */
+  private async hasDataFor(
+    userId: string,
+    month: number,
+    year: number,
+    scope: InsightScope,
+  ): Promise<boolean> {
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+    const period = { gte: start, lt: end };
+
+    if (scope === 'BUDGET') {
+      const budgets = await this.prisma.monthlyBudget.count({ where: { userId, month, year } });
+      return budgets > 0;
+    }
+    if (scope === 'INCOME') {
+      const incomes = await this.prisma.income.count({
+        where: { userId, deletedAt: null, date: period },
+      });
+      return incomes > 0;
+    }
+    if (scope === 'EXPENSE') {
+      const expenses = await this.prisma.expense.count({
+        where: { userId, deletedAt: null, date: period },
+      });
+      return expenses > 0;
+    }
+    // GLOBAL — any movement at all.
+    const [expenses, incomes] = await Promise.all([
+      this.prisma.expense.count({ where: { userId, deletedAt: null, date: period } }),
+      this.prisma.income.count({ where: { userId, deletedAt: null, date: period } }),
+    ]);
+    return expenses + incomes > 0;
+  }
+
+  /** Call-to-action shown instead of invented analysis when there is no data. */
+  private noDataInsights(scope: InsightScope, language: string): GeneratedInsight[] {
+    const fr = language !== 'EN';
+    const copy: Record<InsightScope, { title: string; content: string }> = {
+      EXPENSE: {
+        title: fr ? 'Aucune dépense ce mois-ci' : 'No expenses this month',
+        content: fr
+          ? 'Ajoutez vos dépenses pour obtenir une analyse IA personnalisée.'
+          : 'Add your expenses to unlock personalised AI insights.',
+      },
+      INCOME: {
+        title: fr ? 'Aucun revenu ce mois-ci' : 'No income this month',
+        content: fr
+          ? 'Ajoutez vos revenus pour obtenir une analyse IA personnalisée.'
+          : 'Add your income to unlock personalised AI insights.',
+      },
+      BUDGET: {
+        title: fr ? 'Aucun budget défini' : 'No budget set',
+        content: fr
+          ? 'Définissez un budget par catégorie pour recevoir des conseils IA.'
+          : 'Set a budget per category to receive AI recommendations.',
+      },
+      GLOBAL: {
+        title: fr ? 'Pas encore de données' : 'No data yet',
+        content: fr
+          ? 'Ajoutez des revenus ou des dépenses pour débloquer votre analyse IA.'
+          : 'Add income or expenses to unlock your AI analysis.',
+      },
+    };
+    const { title, content } = copy[scope] ?? copy.GLOBAL;
+    return [{ type: 'ADVICE', title, content, severity: 'info' }];
+  }
+
   async generateInsights(
     userId: string,
     month: number,
     year: number,
     scope: InsightScope = 'GLOBAL',
   ) {
+    // No data → never call the model, never persist. The client renders a CTA.
+    if (!(await this.hasDataFor(userId, month, year, scope))) {
+      const settings = await this.prisma.userSettings.findUnique({ where: { userId } });
+      return {
+        insights: this.noDataInsights(scope, settings?.language ?? 'FR'),
+        configured: this.llm.anyConfigured,
+        empty: true,
+      };
+    }
+
     const key = `${userId}:${year}-${month}:${scope}`;
 
     // 1. Fresh cache hit → instant.

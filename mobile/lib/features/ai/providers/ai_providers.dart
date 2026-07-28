@@ -35,7 +35,8 @@ class AiRepository {
     return ForecastData.fromJson(Map<String, dynamic>.from(data));
   }
 
-  Future<List<RealAiInsight>> generateInsights(int month, int year, {String scope = 'GLOBAL'}) async {
+  Future<AiInsightsResult> generateInsights(int month, int year,
+      {String scope = 'GLOBAL'}) async {
     final data = await _api.post('/ai/insights/generate', query: {
       'month': month,
       'year': year,
@@ -43,10 +44,15 @@ class AiRepository {
     });
     final map = Map<String, dynamic>.from(data);
     final rawList = (map['insights'] as List?) ?? [];
-    return rawList
-        .map((e) => RealAiInsight.fromJson(Map<String, dynamic>.from(e)))
-        .take(5)
-        .toList();
+    return AiInsightsResult(
+      insights: rawList
+          .map((e) => RealAiInsight.fromJson(Map<String, dynamic>.from(e)))
+          .take(5)
+          .toList(),
+      // The backend sets this when there is nothing to analyse, so the UI can
+      // invite the user to add data instead of showing invented advice.
+      empty: map['empty'] == true,
+    );
   }
 
   Future<List<RealAiInsight>> listInsights() async {
@@ -76,6 +82,17 @@ final forecastProvider = FutureProvider.autoDispose<ForecastData>((ref) async {
 
 // ---------------------------------------------------------- AI Insights Controller
 
+/// Insights plus whether the backend refused to analyse for lack of data.
+class AiInsightsResult {
+  final List<RealAiInsight> insights;
+
+  /// True when the period has no records for this scope. The single insight
+  /// returned alongside it is a call to action, not analysis.
+  final bool empty;
+
+  const AiInsightsResult({required this.insights, this.empty = false});
+}
+
 class AiInsightsParam {
   final DateTime date;
   final String scope;
@@ -94,14 +111,14 @@ class AiInsightsParam {
   int get hashCode => date.year.hashCode ^ date.month.hashCode ^ scope.hashCode;
 }
 
-class AiInsightsController extends Notifier<AsyncValue<List<RealAiInsight>>> {
+class AiInsightsController extends Notifier<AsyncValue<AiInsightsResult>> {
   AiInsightsController(this._param);
   final AiInsightsParam _param;
 
   AiRepository get _repo => ref.read(aiRepositoryProvider);
 
   @override
-  AsyncValue<List<RealAiInsight>> build() {
+  AsyncValue<AiInsightsResult> build() {
     Future.microtask(generate);
     return const AsyncValue.loading();
   }
@@ -109,8 +126,9 @@ class AiInsightsController extends Notifier<AsyncValue<List<RealAiInsight>>> {
   Future<void> generate() async {
     state = const AsyncValue.loading();
     try {
-      final list = await _repo.generateInsights(_param.date.month, _param.date.year, scope: _param.scope);
-      state = AsyncValue.data(list.take(5).toList());
+      final result = await _repo.generateInsights(_param.date.month, _param.date.year,
+          scope: _param.scope);
+      state = AsyncValue.data(result);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -118,7 +136,7 @@ class AiInsightsController extends Notifier<AsyncValue<List<RealAiInsight>>> {
 }
 
 final aiInsightsProvider = NotifierProvider.family<AiInsightsController,
-    AsyncValue<List<RealAiInsight>>, AiInsightsParam>((param) => AiInsightsController(param));
+    AsyncValue<AiInsightsResult>, AiInsightsParam>((param) => AiInsightsController(param));
 
 
 // ---------------------------------------------------------- Chat state

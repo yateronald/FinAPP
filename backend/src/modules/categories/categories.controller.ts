@@ -70,8 +70,23 @@ export class CategoriesController {
     return this.categories.archive(userId, id, false);
   }
 
+  @Get(':id/impact')
+  @ApiOperation({
+    summary: 'How many records deleting this category would destroy',
+    description:
+      'Call this before DELETE so the confirmation dialog can state exactly what is lost.',
+  })
+  impact(@CurrentUser('userId') userId: string, @Param('id') id: string) {
+    return this.categories.impact(userId, id);
+  }
+
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete a category' })
+  @ApiOperation({
+    summary: 'Permanently delete a category and every record filed under it',
+    description:
+      'Irreversible. Deletes the category plus its expenses, incomes, budgets and ' +
+      'recurring transactions. Default categories may be deleted too.',
+  })
   remove(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.categories.remove(userId, id);
   }

@@ -12,6 +12,13 @@ serviceAccount.json
 .env.*
 !.env.example
 
+# OAuth client secret bundles downloaded from Google Cloud Console.
+client_secret*.json
+*.p12
+*.pfx
+*.jks
+*.keystore
+
 # --- Local dumps & backups ---------------------------------------------
 *.dump
 *.sql.gz

@@ -5,8 +5,103 @@ import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/category_icons.dart';
+import '../data/categories_repository.dart';
 import '../data/category_model.dart';
 import '../providers/categories_provider.dart';
+
+/// Spells out exactly what a category deletion destroys. Returns true only on
+/// an explicit confirmation.
+Future<bool?> _confirmDeleteCategory(BuildContext context, CategoryImpact i) {
+  final t = context.t;
+  final lines = <String>[
+    if (i.expenses > 0) t.deleteCategoryExpenses(i.expenses),
+    if (i.incomes > 0) t.deleteCategoryIncomes(i.incomes),
+    if (i.budgets > 0) t.deleteCategoryBudgets(i.budgets),
+    if (i.recurring > 0) t.deleteCategoryRecurring(i.recurring),
+  ];
+
+  return showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      icon: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: AppColors.danger.withValues(alpha: 0.12),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.warning_amber_rounded,
+            color: AppColors.danger, size: 26),
+      ),
+      title: Text(
+        t.deleteCategoryTitle(i.name),
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (i.isDefault) ...[
+            Text(t.deleteCategoryDefaultNote,
+                style: TextStyle(fontSize: 12, color: ctx.muted)),
+            const SizedBox(height: 12),
+          ],
+          if (i.isEmpty)
+            Text(t.deleteCategoryEmpty, style: const TextStyle(fontSize: 13.5))
+          else ...[
+            Text(t.deleteCategoryWarning,
+                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final line in lines)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(children: [
+                        const Icon(Icons.remove_circle_outline_rounded,
+                            size: 15, color: AppColors.danger),
+                        const SizedBox(width: 8),
+                        Text(line,
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(t.deleteCategoryIrreversible,
+                style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.danger)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text(t.cancel),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: Text(t.delete),
+        ),
+      ],
+    ),
+  );
+}
 
 /// Icon slugs offered in the picker (must exist in category_icons.dart).
 const _iconChoices = [
@@ -132,7 +227,18 @@ class _CategoryList extends ConsumerWidget {
                       showCategorySheet(context, existing: c);
                       return;
                     } else if (v == 'delete') {
+                      // Deleting a category destroys every record filed under
+                      // it, so never act before the user has seen the cost.
+                      final impact = await repo.impact(c.id);
+                      if (!context.mounted) return;
+                      final confirmed = await _confirmDeleteCategory(context, impact);
+                      if (confirmed != true) return;
                       await repo.remove(c.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(context.t.deleteCategoryDone(c.name)),
+                        ));
+                      }
                     }
                     await refreshCategories(ref);
                   } on ApiException catch (e) {
@@ -144,8 +250,9 @@ class _CategoryList extends ConsumerWidget {
                 },
                 itemBuilder: (_) => [
                   PopupMenuItem(value: 'edit', child: Text(context.t.edit)),
-                  if (!c.isDefault)
-                    PopupMenuItem(value: 'delete', child: Text(context.t.delete)),
+                  // Default categories are deletable too — they are only a
+                  // starting point, not a fixed set.
+                  PopupMenuItem(value: 'delete', child: Text(context.t.delete)),
                 ],
               ),
             ),

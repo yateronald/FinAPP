@@ -402,6 +402,97 @@ class AppText {
   String deleteBody(String title) =>
       _s('« $title » sera définitivement supprimé.', '"$title" will be permanently deleted.');
 
+  // ------------------------------------------ Category deletion warning
+  String deleteCategoryTitle(String name) =>
+      _s('Supprimer « $name » ?', 'Delete "$name"?');
+  String get deleteCategoryEmpty => _s(
+        'Cette catégorie ne contient aucune donnée. Elle sera supprimée définitivement.',
+        'This category holds no data. It will be permanently deleted.',
+      );
+  String get deleteCategoryWarning => _s(
+        'Tout ce qui est enregistré sous cette catégorie sera supprimé définitivement :',
+        'Everything recorded under this category will be permanently deleted:',
+      );
+  String deleteCategoryExpenses(int n) =>
+      _s('$n dépense${n > 1 ? 's' : ''}', '$n expense${n > 1 ? 's' : ''}');
+  String deleteCategoryIncomes(int n) =>
+      _s('$n revenu${n > 1 ? 's' : ''}', '$n income entr${n > 1 ? 'ies' : 'y'}');
+  String deleteCategoryBudgets(int n) =>
+      _s('$n budget${n > 1 ? 's' : ''}', '$n budget${n > 1 ? 's' : ''}');
+  String deleteCategoryRecurring(int n) => _s(
+        '$n transaction${n > 1 ? 's' : ''} récurrente${n > 1 ? 's' : ''}',
+        '$n recurring transaction${n > 1 ? 's' : ''}',
+      );
+  String get deleteCategoryIrreversible =>
+      _s('Cette action est irréversible.', 'This action cannot be undone.');
+  String get deleteCategoryDefaultNote => _s(
+        'Catégorie par défaut — vous pouvez la supprimer si vous ne l’utilisez pas.',
+        'Default category — you can remove it if you don’t use it.',
+      );
+  String deleteCategoryDone(String name) =>
+      _s('« $name » supprimée', '"$name" deleted');
+
+  // ------------------------------------------------- AI empty states
+  String get aiNoDataTitle => _s('Pas encore de données', 'No data yet');
+  String get aiNoDataDashboard => _s(
+        'Ajoutez des revenus ou des dépenses pour débloquer votre analyse IA.',
+        'Add income or expenses to unlock your AI analysis.',
+      );
+  String get aiNoDataExpense => _s(
+        'Ajoutez des dépenses pour obtenir une analyse IA personnalisée.',
+        'Add expenses to unlock personalised AI insights.',
+      );
+  String get aiNoDataIncome => _s(
+        'Ajoutez des revenus pour obtenir une analyse IA personnalisée.',
+        'Add income to unlock personalised AI insights.',
+      );
+  String get aiNoDataBudget => _s(
+        'Définissez un budget par catégorie pour recevoir des conseils IA.',
+        'Set a budget per category to receive AI recommendations.',
+      );
+
+  // --------------------------------------------- AI forecast data gate
+  String get forecastNeedsDataTitle =>
+      _s('Prévisions bientôt disponibles', 'Forecast not available yet');
+  String get forecastNeedsDataBody => _s(
+        'Les prévisions s’appuient sur votre historique. Ajoutez quelques '
+            'transactions sur au moins deux mois et l’analyse se débloquera '
+            'automatiquement.',
+        'Forecasts are built from your history. Add a few transactions across '
+            'at least two months and the analysis unlocks automatically.',
+      );
+  String forecastMonthsProgress(int have, int need) => _s(
+        '$have/$need mois avec des données',
+        '$have/$need months with data',
+      );
+  String forecastTxProgress(int have, int need) => _s(
+        '$have/$need transactions enregistrées',
+        '$have/$need transactions recorded',
+      );
+  String forecastLowConfidence(int months) => _s(
+        'Prévision basée sur $months mois d’historique — la précision '
+            'augmentera avec le temps.',
+        'Forecast based on $months months of history — accuracy improves over time.',
+      );
+
+  // ------------------------------------------ Biometric enrolment prompt
+  String get biometricPromptTitle =>
+      _s('Protéger l’application ?', 'Protect the app?');
+  String get biometricPromptBody => _s(
+        'Utilisez votre empreinte digitale pour déverrouiller Fynexa. '
+            'Vos données financières restent privées même si votre téléphone est déverrouillé.',
+        'Use your fingerprint to unlock Fynexa. Your financial data stays private '
+            'even if someone else has your unlocked phone.',
+      );
+  String get biometricPromptEnable => _s('Activer', 'Enable');
+  String get biometricPromptLater => _s('Plus tard', 'Not now');
+  String get biometricEnabled =>
+      _s('Verrouillage biométrique activé', 'Biometric lock enabled');
+  String get biometricFailed => _s(
+        'Impossible d’activer la biométrie. Réessayez depuis les Réglages.',
+        'Could not enable biometrics. Try again from Settings.',
+      );
+
   static AppText of(BuildContext context) =>
       Localizations.of<AppText>(context, AppText) ?? const AppText('fr');
 }

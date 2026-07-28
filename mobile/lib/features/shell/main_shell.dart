@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
 import '../ai/presentation/ai_screen.dart';
+import '../auth/presentation/biometric_prompt.dart';
 import '../auth/providers/auth_provider.dart';
 import '../budgets/presentation/budgets_screen.dart';
 import '../budgets/presentation/set_budget_sheet.dart';
@@ -27,6 +28,16 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
+  @override
+  void initState() {
+    super.initState();
+    // Offer biometric app-lock once, after the first sign-in. Deferred to the
+    // first frame so the dialog has a mounted route to attach to.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeOfferBiometricEnrolment(context, ref);
+    });
+  }
+
   String _title(AppText t, int index) =>
       [t.titleHome, t.titleFinances, t.titleBudgets, t.titleAi][index];
 

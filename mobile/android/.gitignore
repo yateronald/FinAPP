@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# PKCS12 is the modern keystore format — Flutter's stock ignore list predates
+# it, so these must be added explicitly or the private key gets committed.
+**/*.p12
+**/*.pfx

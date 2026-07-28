@@ -3,6 +3,14 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { dayOfMonthProfile, quantile, selectModel } from './forecasting';
 
 /**
+ * Minimum history before a forecast is worth showing. Two distinct months is
+ * the floor for observing any direction at all, and a handful of transactions
+ * guards against a single stray entry looking like a trend.
+ */
+export const FORECAST_MIN_MONTHS = 2;
+export const FORECAST_MIN_TRANSACTIONS = 5;
+
+/**
  * Cash-flow forecasting engine.
  *
  * Pipeline (per user, fully data-driven — improves as history grows):
@@ -87,6 +95,44 @@ export class ForecastService {
     return first <= 0 ? series : series.slice(first);
   }
 
+  /**
+   * Same shape as a real forecast, but with every derived section empty and a
+   * `dataQuality` block explaining what is missing. The client renders a CTA
+   * instead of charts — never a prediction built from one data point.
+   */
+  private insufficientDataResponse(
+    horizonDays: number,
+    now: Date,
+    balanceNow: number,
+    dataQuality: Record<string, unknown>,
+  ) {
+    const horizonEnd = new Date(now.getTime() + horizonDays * this.DAY)
+      .toISOString()
+      .slice(0, 10);
+    return {
+      horizonDays,
+      generatedAt: now.toISOString(),
+      dataQuality,
+      models: { income: null, expenses: null },
+      overview: {
+        projectedIncome: 0,
+        incomeTrend: 0,
+        projectedExpenses: 0,
+        expenseTrend: 0,
+        projectedSavings: 0,
+        savingsTrend: 0,
+        projectedBalance: Math.round(balanceNow),
+        balanceDate: horizonEnd,
+      },
+      cashflow: [],
+      byCategory: [],
+      totalProjected: 0,
+      alerts: [],
+      suggestions: [],
+      objectives: [],
+    };
+  }
+
   async forecast(userId: string, horizonDays = 30) {
     const now = new Date();
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -99,8 +145,9 @@ export class ForecastService {
       Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - profileMonths + 1, 1),
     );
 
-    const [incByMonth, expByMonth, catMonthly, recentInc, recentExp, lifeInc, lifeExp] =
+    const [settings, incByMonth, expByMonth, catMonthly, recentInc, recentExp, lifeInc, lifeExp] =
       await Promise.all([
+        this.prisma.userSettings.findUnique({ where: { userId }, select: { currency: true } }),
         this.monthlyTotals('income', userId, historyStart),
         this.monthlyTotals('expenses', userId, historyStart),
         this.categoryMonthly(userId, historyStart),
@@ -112,15 +159,55 @@ export class ForecastService {
           where: { userId, deletedAt: null, date: { gte: profileStart } },
           select: { amount: true, date: true },
         }),
-        this.prisma.income.aggregate({ where: { userId, deletedAt: null }, _sum: { amount: true } }),
-        this.prisma.expense.aggregate({ where: { userId, deletedAt: null }, _sum: { amount: true } }),
+        this.prisma.income.aggregate({
+          where: { userId, deletedAt: null },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        this.prisma.expense.aggregate({
+          where: { userId, deletedAt: null },
+          _sum: { amount: true },
+          _count: true,
+        }),
       ]);
 
     const balanceNow = Number(lifeInc._sum.amount ?? 0) - Number(lifeExp._sum.amount ?? 0);
+    const transactionCount = (lifeInc._count ?? 0) + (lifeExp._count ?? 0);
+    const currency = settings?.currency ?? 'XOF';
 
     // ---- Model selection per series (rolling-origin CV inside selectModel).
     const incSeries = this.trimLeadingZeros(this.seriesFrom(incByMonth, endKey, historyMonths));
     const expSeries = this.trimLeadingZeros(this.seriesFrom(expByMonth, endKey, historyMonths));
+
+    // ---- Is there enough history for a forecast to mean anything?
+    //
+    // Any time-series model will happily extrapolate from a single point, but
+    // the output is noise dressed up as a prediction. Below these thresholds we
+    // return no alerts, no suggestions and no objectives, and tell the client
+    // exactly what is still missing.
+    const monthsWithData = Math.max(
+      incSeries.filter((v) => v > 0).length,
+      expSeries.filter((v) => v > 0).length,
+    );
+    const hasEnoughData =
+      monthsWithData >= FORECAST_MIN_MONTHS && transactionCount >= FORECAST_MIN_TRANSACTIONS;
+
+    const dataQuality = {
+      hasEnoughData,
+      monthsWithData,
+      transactions: transactionCount,
+      monthsRequired: FORECAST_MIN_MONTHS,
+      transactionsRequired: FORECAST_MIN_TRANSACTIONS,
+      // 2 months = directional only, 3-5 = fair, 6+ = the models have something
+      // real to chew on.
+      confidence:
+        monthsWithData >= 6 ? 'high' : monthsWithData >= 3 ? 'medium' : ('low' as const),
+    };
+
+    if (!hasEnoughData) {
+      return this.insufficientDataResponse(horizonDays, now, balanceNow, dataQuality);
+    }
+
     const incModel = selectModel(incSeries, 12);
     const expModel = selectModel(expSeries, 12);
 
@@ -266,28 +353,35 @@ export class ForecastService {
       alerts.push({
         type: 'warning',
         title: `Vos dépenses pourraient dépasser vos revenus le ${negativePoint.date}.`,
-        detail: `Solde prévisionnel négatif estimé : ${negativePoint.forecast} XOF.`,
+        detail: `Solde prévisionnel négatif estimé : ${negativePoint.forecast} ${currency}.`,
       });
     }
     const monthlySavings = incNext - expNext;
-    if (monthlySavings > 0) {
-      alerts.push({
-        type: 'good',
-        title: 'Votre épargne devrait continuer à progresser.',
-        detail: `Épargne mensuelle projetée : +${Math.round(monthlySavings)} XOF.`,
-      });
-    } else {
-      alerts.push({
-        type: 'warning',
-        title: 'Votre épargne pourrait stagner ce mois-ci.',
-        detail: 'Vos dépenses projetées approchent de vos revenus.',
-      });
+    // Only speak about savings when both sides of the equation are real. With
+    // income or expenses projected at zero the statement would be an artefact
+    // of missing data, not a finding.
+    if (incNext > 0 && expNext > 0) {
+      if (monthlySavings > 0) {
+        alerts.push({
+          type: 'good',
+          title: 'Votre épargne devrait continuer à progresser.',
+          detail: `Épargne mensuelle projetée : +${Math.round(monthlySavings)} ${currency}.`,
+        });
+      } else {
+        alerts.push({
+          type: 'warning',
+          title: 'Votre épargne pourrait stagner ce mois-ci.',
+          detail: `Dépenses projetées (${Math.round(expNext)} ${currency}) proches des revenus (${Math.round(incNext)} ${currency}).`,
+        });
+      }
     }
 
-    // ---- Suggestions.
+    // ---- Suggestions. Every one must be derived from an actual number; there
+    // is no generic filler entry, so an uneventful month yields fewer cards
+    // rather than reassuring boilerplate.
     const suggestions: { text: string; cta: string }[] = [];
     const rising = byCategory
-      .filter((c) => c.evolution > 0)
+      .filter((c) => c.evolution > 0 && c.projected > 0)
       .sort((a, b) => b.evolution - a.evolution)[0];
     if (rising) {
       suggestions.push({
@@ -295,21 +389,26 @@ export class ForecastService {
         cta: 'Fixez un budget pour cette catégorie.',
       });
     }
-    const biggest = byCategory[0];
+    const biggest = byCategory.find((c) => c.projected > 0);
     if (biggest) {
       const save = Math.round(biggest.projected * 0.15);
+      if (save > 0) {
+        suggestions.push({
+          text: `Vous pourriez économiser ${save} ${currency} en réduisant vos dépenses de ${biggest.name}.`,
+          cta: 'Voir suggestions',
+        });
+      }
+    }
+    // A claim about a "trend" needs enough points to be defensible.
+    if (dataQuality.confidence !== 'low' && incNext > 0 && expNext > 0) {
       suggestions.push({
-        text: `Vous pourriez économiser ${save} XOF en réduisant vos dépenses de ${biggest.name}.`,
-        cta: 'Voir suggestions',
+        text:
+          monthlySavings > 0
+            ? `Tendance positive : votre épargne progresse sur ${monthsWithData} mois de données.`
+            : 'Surveillez vos dépenses variables pour préserver votre épargne.',
+        cta: monthlySavings > 0 ? 'Continuez ainsi !' : 'Revoir mes dépenses',
       });
     }
-    suggestions.push({
-      text:
-        monthlySavings > 0
-          ? 'Tendance positive : votre épargne augmente régulièrement.'
-          : 'Surveillez vos dépenses variables pour préserver votre épargne.',
-      cta: 'Continuez ainsi !',
-    });
 
     // ---- Objectives.
     const avgMonthlyExpense = expNext || curExpense || 1;
@@ -352,6 +451,7 @@ export class ForecastService {
     return {
       horizonDays,
       generatedAt: now.toISOString(),
+      dataQuality,
       models: {
         income: {
           name: incModel.name,

@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import '../../../core/i18n/app_text.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../shell/shell_providers.dart';
@@ -138,8 +139,12 @@ class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
         state.when(
           loading: () => _buildSkeleton(context),
           error: (err, _) => _buildError(context, controller),
-          data: (insights) {
-            final list = insights.take(5).toList();
+          data: (result) {
+            // Nothing recorded for this period → invite the user to add data
+            // rather than showing analysis of an empty month.
+            if (result.empty) return _buildNoData(context);
+
+            final list = result.insights.take(5).toList();
             if (list.isEmpty) return _buildEmpty(context, controller);
 
             return Column(
@@ -183,6 +188,60 @@ class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
           },
         ),
       ],
+    );
+  }
+
+  /// Shown when the period genuinely has no records for this scope. Not an
+  /// error and not retryable — the user simply has nothing to analyse yet.
+  Widget _buildNoData(BuildContext context) {
+    final t = context.t;
+    final message = switch (widget.scope) {
+      'BUDGET' => t.aiNoDataBudget,
+      'EXPENSE' => t.aiNoDataExpense,
+      'INCOME' => t.aiNoDataIncome,
+      _ => t.aiNoDataDashboard,
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: const Icon(Icons.insights_rounded,
+                color: AppColors.primary, size: 21),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  t.aiNoDataTitle,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: TextStyle(fontSize: 12, height: 1.35, color: context.muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
