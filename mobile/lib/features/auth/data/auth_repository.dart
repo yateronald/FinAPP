@@ -33,7 +33,16 @@ class AuthRepository {
       if (country != null && country.isNotEmpty) 'country': country,
       if (currency != null && currency.isNotEmpty) 'currency': currency,
     }, auth: false);
-    return Map<String, dynamic>.from(data);
+    final map = Map<String, dynamic>.from(data);
+    // When the server has no mail configured it skips the OTP and hands back a
+    // session directly — persist it so the app can go straight in.
+    if (map['requiresVerification'] == false && map['accessToken'] != null) {
+      await SecureStorage.instance.saveTokens(
+        access: map['accessToken'],
+        refresh: map['refreshToken'],
+      );
+    }
+    return map;
   }
 
   Future<AppUser> verifyEmail(String email, String code) async {

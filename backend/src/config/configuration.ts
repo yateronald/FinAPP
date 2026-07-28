@@ -50,6 +50,12 @@ export default () => ({
   otp: {
     expiresMinutes: parseInt(process.env.OTP_EXPIRES_MINUTES || '10', 10),
   },
+  auth: {
+    // Unset = follow SMTP: with no mail server the OTP can never reach the
+    // user, so requiring it would lock every new account out permanently.
+    // Set to 'true'/'false' to force the behaviour either way.
+    requireEmailVerification: process.env.AUTH_REQUIRE_EMAIL_VERIFICATION,
+  },
   throttle: {
     ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
     limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),

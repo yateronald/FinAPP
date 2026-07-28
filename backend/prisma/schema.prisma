@@ -102,6 +102,14 @@ model User {
   isActive          Boolean   @default(true) @map("is_active")
   lastLoginAt       DateTime? @map("last_login_at")
 
+  // --- Admin-managed account state ---
+  /// Forces a password change on the next login (set after an admin reset).
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
+  passwordChangedAt  DateTime? @map("password_changed_at")
+  /// Who disabled the account and why (null while active).
+  disabledAt         DateTime? @map("disabled_at")
+  disabledReason     String?   @map("disabled_reason")
+
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   deletedAt         DateTime? @map("deleted_at")

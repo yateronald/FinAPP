@@ -19,12 +19,19 @@ export function useLogin() {
       api.post<LoginResponse>('/auth/login', data),
     onSuccess: (res) => {
       setAuth(res.user, res.accessToken);
-      router.push('/dashboard');
+      // A password reset by an admin forces a change before anything else.
+      if ((res.user as { mustChangePassword?: boolean })?.mustChangePassword) {
+        router.push('/change-password');
+        return;
+      }
+      // Admins run the monitoring dashboard, not the finance app.
+      router.push(res.user?.role === 'ADMIN' ? '/admin' : '/dashboard');
     },
   });
 }
 
 export function useRegister() {
+  const setAuth = useAuthStore((s) => s.setAuth);
   return useMutation({
     mutationFn: (data: {
       email: string;
@@ -32,7 +39,17 @@ export function useRegister() {
       firstName?: string;
       lastName?: string;
       language?: string;
-    }) => api.post<{ email: string; requiresVerification: boolean }>('/auth/register', data),
+    }) =>
+      api.post<{ email: string; requiresVerification: boolean } & Partial<LoginResponse>>(
+        '/auth/register',
+        data,
+      ),
+    onSuccess: (res) => {
+      // With no mail configured the server skips the OTP and returns a session.
+      if (!res.requiresVerification && res.user && res.accessToken) {
+        setAuth(res.user, res.accessToken);
+      }
+    },
   });
 }
 

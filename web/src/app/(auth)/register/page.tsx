@@ -36,7 +36,12 @@ export default function RegisterPage() {
     registerMutation.mutate(
       { ...values, language: locale.toUpperCase() },
       {
-        onSuccess: () => {
+        onSuccess: (res) => {
+          // No verification step when the server has no mail configured.
+          if (!res.requiresVerification) {
+            router.push('/dashboard');
+            return;
+          }
           toast.success(t('verifySubtitle'));
           router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
         },

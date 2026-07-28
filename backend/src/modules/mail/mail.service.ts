@@ -24,6 +24,14 @@ export class MailService {
     }
   }
 
+  /**
+   * Whether a real transporter exists. Flows that would strand a user when no
+   * mail can leave the server (email-verification OTP) check this first.
+   */
+  get isConfigured(): boolean {
+    return this.transporter !== null;
+  }
+
   private async send(to: string, subject: string, html: string) {
     const fromName = this.config.get<string>('mail.fromName');
     const fromAddress = this.config.get<string>('mail.fromAddress');

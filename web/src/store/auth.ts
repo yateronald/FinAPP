@@ -9,6 +9,8 @@ export interface AuthUser {
   avatarUrl?: string | null;
   role: string;
   emailVerified: boolean;
+  /** Set after an admin resets the password — forces a change before any use. */
+  mustChangePassword?: boolean;
   settings?: {
     language: 'FR' | 'EN';
     currency: string;

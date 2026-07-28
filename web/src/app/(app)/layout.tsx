@@ -14,9 +14,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Zustand persist hydrates on mount; give it a tick then guard.
-    const token = useAuthStore.getState().accessToken;
+    const { accessToken: token, user } = useAuthStore.getState();
     if (!token) {
       router.replace('/login');
+    } else if ((user as { mustChangePassword?: boolean })?.mustChangePassword) {
+      router.replace('/change-password');
+    } else if (user?.role === 'ADMIN') {
+      // Admins belong in the monitoring dashboard, not the finance app.
+      router.replace('/admin');
     } else {
       setReady(true);
     }

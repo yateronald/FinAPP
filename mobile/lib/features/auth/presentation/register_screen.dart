@@ -8,6 +8,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/responsive.dart';
+import '../data/user_model.dart';
 import '../providers/auth_provider.dart';
 import 'auth_widgets.dart';
 
@@ -61,7 +62,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     setState(() => _loading = true);
     try {
       final lang = Localizations.localeOf(context).languageCode.toUpperCase() == 'EN' ? 'EN' : 'FR';
-      await ref.read(authRepositoryProvider).register(
+      final res = await ref.read(authRepositoryProvider).register(
             email: _email.text.trim(),
             password: _password.text,
             firstName: _first.text.trim(),
@@ -70,7 +71,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             country: _country?.$2,
             currency: _currency.$1,
           );
-      if (mounted) context.push('/verify', extra: _email.text.trim());
+      if (!mounted) return;
+      // No verification step when the server has no mail configured — it hands
+      // back a session with the account, so go straight in.
+      if (res['requiresVerification'] == false && res['user'] != null) {
+        ref
+            .read(authProvider.notifier)
+            .setUser(AppUser.fromJson(Map<String, dynamic>.from(res['user'])));
+        context.go('/home');
+      } else {
+        context.push('/verify', extra: _email.text.trim());
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

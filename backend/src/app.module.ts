@@ -24,6 +24,8 @@ import { AuditModule } from './modules/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { PasswordChangeGuard } from './common/guards/password-change.guard';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -55,11 +57,13 @@ import { RolesGuard } from './common/guards/roles.guard';
     NotificationsModule,
     SettingsModule,
     HealthModule,
+    AdminModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PasswordChangeGuard },
   ],
 })
 export class AppModule {}

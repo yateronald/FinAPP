@@ -33,6 +33,19 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
+  /**
+   * Email verification is only enforceable when mail can actually leave the
+   * server. With SMTP unconfigured the OTP is written to the log and never
+   * reaches the user, so demanding it would make every new account
+   * unreachable. An explicit AUTH_REQUIRE_EMAIL_VERIFICATION overrides this.
+   */
+  private get requireEmailVerification(): boolean {
+    const forced = this.config.get<string>('auth.requireEmailVerification');
+    if (forced === 'true') return true;
+    if (forced === 'false') return false;
+    return this.mail.isConfigured;
+  }
+
   // ---------------------------------------------------------------- Register
   async register(dto: RegisterDto, device: DeviceContext) {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
@@ -41,6 +54,7 @@ export class AuthService {
     }
 
     const passwordHash = await this.tokens.hashPassword(dto.password);
+    const needsVerification = this.requireEmailVerification;
 
     const user = await this.prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
@@ -50,6 +64,7 @@ export class AuthService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           country: dto.country,
+          emailVerified: !needsVerification,
           settings: {
             create: {
               language: dto.language ?? Language.EN,
@@ -72,9 +87,19 @@ export class AuthService {
       return created;
     });
 
-    await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION);
     await this.audit.log({ userId: user.id, action: 'REGISTER', entity: 'User', entityId: user.id, ...device });
 
+    if (!needsVerification) {
+      // No mail to wait for — hand back a session so the app signs straight in.
+      return {
+        message: 'Registration successful.',
+        email: user.email,
+        requiresVerification: false,
+        ...(await this.completeLogin(user.id, user.email, user.role, device)),
+      };
+    }
+
+    await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION);
     return {
       message: 'Registration successful. Please verify your email with the code we sent.',
       email: user.email,
@@ -87,19 +112,42 @@ export class AuthService {
     const user = await this.prisma.user.findFirst({
       where: { email: dto.email, deletedAt: null },
     });
+    // Failed attempts are audited so the admin dashboard can surface them —
+    // repeated failures on an account are an early sign of a break-in attempt.
+    const auditFailure = (reason: string) =>
+      this.audit.log({
+        userId: user?.id,
+        action: 'LOGIN_FAILED',
+        entity: 'User',
+        entityId: user?.id,
+        metadata: { email: dto.email, reason },
+        ...device,
+      });
+
     if (!user || !user.passwordHash) {
+      await auditFailure('UNKNOWN_ACCOUNT');
       throw new UnauthorizedException('Invalid credentials');
     }
     if (!user.isActive) {
+      await auditFailure('ACCOUNT_DISABLED');
       throw new UnauthorizedException('Account is disabled');
     }
 
     const valid = await this.tokens.verifyPassword(user.passwordHash, dto.password);
     if (!valid) {
+      await auditFailure('BAD_PASSWORD');
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (!user.emailVerified) {
+    // Admin accounts are web-only: the mobile app has no admin UI, so signing in
+    // there would strand them in an app they cannot use.
+    if (user.role === 'ADMIN' && device.clientType === 'mobile') {
+      throw new UnauthorizedException(
+        'Admin accounts must sign in on the web dashboard.',
+      );
+    }
+
+    if (!user.emailVerified && this.requireEmailVerification) {
       await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION);
       throw new UnauthorizedException(
         'Email not verified. A new verification code has been sent.',
@@ -127,6 +175,9 @@ export class AuthService {
   }
 
   async resendOtp(email: string) {
+    if (!this.requireEmailVerification) {
+      return { message: 'Email verification is disabled — you can sign in directly.' };
+    }
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (user && !user.emailVerified) {
       await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION);
@@ -169,7 +220,11 @@ export class AuthService {
     if (!valid) throw new BadRequestException('Current password is incorrect');
 
     const passwordHash = await this.tokens.hashPassword(newPassword);
-    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    await this.prisma.user.update({
+      where: { id: userId },
+      // Clearing the flag lifts the forced-change gate.
+      data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() },
+    });
     await this.tokens.revokeAllForUser(userId);
     await this.audit.log({ userId, action: 'PASSWORD_CHANGED', entity: 'User', entityId: userId });
 
@@ -287,6 +342,7 @@ export class AuthService {
         avatarUrl: true,
         role: true,
         emailVerified: true,
+        mustChangePassword: true,
         settings: true,
       },
     });

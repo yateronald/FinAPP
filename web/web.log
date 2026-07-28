@@ -1,0 +1,97 @@
+
+> fintrack-web@1.0.0 dev
+> next dev
+
+   ▲ Next.js 15.0.3
+   - Local:        http://localhost:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 4.8s
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 9.1s (1927 modules)
+ GET /admin 200 in 9976ms
+ ○ Compiling /admin/users ...
+ ✓ Compiled /admin/users in 2.8s (1964 modules)
+ GET /admin/users 200 in 3314ms
+ ○ Compiling /admin/admins ...
+ ✓ Compiled /admin/admins in 753ms (1969 modules)
+ GET /admin/admins 200 in 896ms
+ ✓ Compiled /admin/audit in 440ms (1976 modules)
+ GET /admin/audit 200 in 560ms
+ GET /admin/users 200 in 92ms
+ GET /admin/users 200 in 572ms
+ ○ Compiling /icon.png ...
+ ✓ Compiled /icon.png in 1460ms (1039 modules)
+ GET /icon.png?314e63f2cd75c857 200 in 2301ms
+ ✓ Compiled /admin/admins in 499ms (1050 modules)
+ GET /admin/admins 200 in 875ms
+ GET /admin/users 200 in 101ms
+ GET /admin/admins 200 in 343ms
+ GET /admin/users 200 in 106ms
+ ✓ Compiled in 1165ms (1971 modules)
+ GET /admin/users 200 in 307ms
+ ✓ Compiled in 892ms (943 modules)
+ GET /admin/users 200 in 48ms
+ ○ Compiling /admin/audit ...
+ ✓ Compiled /admin/audit in 689ms (1047 modules)
+ GET /admin/audit 200 in 1134ms
+ GET /admin/users 200 in 196ms
+ ○ Compiling /icon.png ...
+ ✓ Compiled /icon.png in 801ms (1062 modules)
+ GET /icon.png?314e63f2cd75c857 200 in 1510ms
+ GET /admin/audit 200 in 467ms
+ ✓ Compiled in 1871ms (2005 modules)
+ GET /admin/audit 200 in 466ms
+ ✓ Compiled in 4.8s (2005 modules)
+ GET /admin/audit 200 in 430ms
+ ✓ Compiled in 9.5s (2005 modules)
+ GET /admin/audit 200 in 368ms
+ ✓ Compiled in 4.4s (2005 modules)
+ GET /admin/audit 200 in 311ms
+ ✓ Compiled in 3.4s (2005 modules)
+ GET /admin/audit 200 in 77ms
+ ✓ Compiled in 1192ms (1990 modules)
+ GET /admin/audit 200 in 192ms
+ ✓ Compiled in 1085ms (1990 modules)
+ GET /admin/audit 200 in 204ms
+ GET /admin/users 200 in 310ms
+ GET /admin/audit 200 in 231ms
+ ○ Compiling /icon.png ...
+ ✓ Compiled /icon.png in 944ms (1062 modules)
+ GET /icon.png?314e63f2cd75c857 200 in 1409ms
+ GET /admin/users 200 in 431ms
+ ✓ Compiled in 954ms (2005 modules)
+ GET /admin/users 200 in 123ms
+ ✓ Compiled in 1171ms (2005 modules)
+ GET /admin/users 200 in 98ms
+ ✓ Compiled in 938ms (2005 modules)
+ GET /admin/users 200 in 94ms
+ ✓ Compiled in 1127ms (1990 modules)
+ GET /admin/users 200 in 173ms
+ ✓ Compiled in 4s (1990 modules)
+ GET /admin/users 200 in 519ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 686ms (1061 modules)
+ GET /admin 200 in 1046ms
+ GET /admin/users 200 in 46ms
+ GET /admin/audit 200 in 42ms
+ GET /admin/admins 200 in 93ms
+ GET /admin/users 200 in 201ms
+ ○ Compiling /icon.png ...
+ ✓ Compiled /icon.png in 1129ms (1076 modules)
+ GET /icon.png?314e63f2cd75c857 200 in 1799ms
+ GET /admin/audit 200 in 477ms
+ GET /admin/admins 200 in 90ms
+ GET /admin/users 200 in 104ms
+ GET /admin 200 in 110ms
+ GET /admin/admins 200 in 112ms
+ GET /admin/users 200 in 90ms
+ GET /admin/users 200 in 784ms
+ GET /icon.png?314e63f2cd75c857 200 in 90ms
+ ✓ Compiled in 617ms (943 modules)
+ ✓ Compiled in 339ms (943 modules)
+ GET /admin/users 200 in 326ms
+ GET /admin/users 200 in 97ms
+ ✓ Compiled in 318ms (943 modules)
+ GET /admin/users 200 in 66ms
