@@ -44,6 +44,10 @@ class _GoogleAuthButtonState extends ConsumerState<GoogleAuthButton> {
       context.go('/home');
     } on GoogleAuthUnavailable {
       if (mounted) _snack(context.t.googleUnavailable);
+    } on GoogleAuthMisconfigured catch (e) {
+      // Show the underlying reason: this is a setup problem, and a generic
+      // message would leave nothing to act on.
+      if (mounted) _snack('${context.t.googleSetupError}\n${e.detail}');
     } on ApiException catch (e) {
       if (!mounted) return;
       switch (e.code) {

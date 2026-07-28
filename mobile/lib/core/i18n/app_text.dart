@@ -451,6 +451,29 @@ class AppText {
         'Set a budget per category to receive AI recommendations.',
       );
 
+  // --------------------------------------------------- First-run welcome
+  String welcomeTitle(String? name) => (name == null || name.isEmpty)
+      ? _s('Bienvenue sur Fynexa 👋', 'Welcome to Fynexa 👋')
+      : _s('Bienvenue sur Fynexa, $name 👋', 'Welcome to Fynexa, $name 👋');
+  String get welcomeBody => _s(
+        'Vous venez de faire le premier pas vers des finances plus sereines. '
+            'Enregistrez votre première dépense aujourd’hui : en quelques jours, '
+            'votre tableau de bord et votre assistant IA commenceront à révéler '
+            'vos habitudes.',
+        'You’ve just taken the first step toward calmer finances. Record your '
+            'first expense today — within a few days your dashboard and AI '
+            'assistant will start revealing your habits, and helping you save.',
+      );
+  String get welcomeCta =>
+      _s('Ajouter ma première dépense', 'Add my first expense');
+  String get welcomeLater => _s('Plus tard', 'Later');
+  String get welcomePoint1 =>
+      _s('Notez vos dépenses en 30 secondes', 'Log an expense in 30 seconds');
+  String get welcomePoint2 =>
+      _s('Fixez des budgets et suivez-les', 'Set budgets and track them');
+  String get welcomePoint3 =>
+      _s('Recevez des conseils IA personnalisés', 'Get personalised AI insights');
+
   // ------------------------------------------------------ Google sign-in
   String get signUpWithGoogle =>
       _s('S’inscrire avec Google', 'Sign up with Google');
@@ -474,6 +497,10 @@ class AppText {
   String get googleUnavailable => _s(
         'Google Sign-In n’est pas disponible sur cet appareil.',
         'Google Sign-In is not available on this device.',
+      );
+  String get googleSetupError => _s(
+        'Configuration Google incomplète pour cette application.',
+        'Google sign-in is not configured for this app build.',
       );
   String get googleEmailUnverified => _s(
         'Votre adresse Google n’est pas vérifiée.',

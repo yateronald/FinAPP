@@ -14,7 +14,23 @@
       },
       "oauth_client": [
         {
-          "client_id": "939949089938-j3b1dt0ccm8a4pcv45f4i7sok4btdcmt.apps.googleusercontent.com",
+          "client_id": "939949089938-k9a6bocftmvi4p2ue99qt8o6bo76mm9q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fintrack.fintrack",
+            "certificate_hash": "75793df63e123918814cefa4147bfd8f7f84fffc"
+          }
+        },
+        {
+          "client_id": "939949089938-n0b7m16jnnv74p82rvraaduhu52saj2i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fintrack.fintrack",
+            "certificate_hash": "6b5ba35ea2f56a0524882f7f0da2b9396f02d1df"
+          }
+        },
+        {
+          "client_id": "939949089938-qjdiitpt2b41s6sfaq50otabstds43kf.apps.googleusercontent.com",
           "client_type": 3
         }
       ],

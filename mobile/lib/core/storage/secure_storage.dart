@@ -14,6 +14,7 @@ class SecureStorage {
   static const _kRefresh = 'ft_refresh_token';
   static const _kBiometric = 'ft_biometric_enabled';
   static const _kBiometricAsked = 'ft_biometric_prompted';
+  static const _kWelcomeShown = 'ft_welcome_shown';
 
   Future<void> saveTokens({required String access, String? refresh}) async {
     await _storage.write(key: _kAccess, value: access);
@@ -34,6 +35,13 @@ class SecureStorage {
       _storage.write(key: _kBiometricAsked, value: '1');
   Future<bool> get biometricPrompted async =>
       (await _storage.read(key: _kBiometricAsked)) == '1';
+
+  /// The welcome sheet is a one-time greeting. The server tells us it is the
+  /// first sign-in, but that flag would fire again on a reinstall, so we also
+  /// record it locally.
+  Future<void> markWelcomeShown() => _storage.write(key: _kWelcomeShown, value: '1');
+  Future<bool> get welcomeShown async =>
+      (await _storage.read(key: _kWelcomeShown)) == '1';
 
   Future<void> clear() async {
     await _storage.delete(key: _kAccess);

@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
 import '../ai/presentation/ai_screen.dart';
 import '../auth/presentation/biometric_prompt.dart';
+import '../auth/presentation/welcome_sheet.dart';
 import '../auth/providers/auth_provider.dart';
 import '../budgets/presentation/budgets_screen.dart';
 import '../budgets/presentation/set_budget_sheet.dart';
@@ -31,11 +32,22 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   void initState() {
     super.initState();
-    // Offer biometric app-lock once, after the first sign-in. Deferred to the
-    // first frame so the dialog has a mounted route to attach to.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) maybeOfferBiometricEnrolment(context, ref);
-    });
+    // Deferred to the first frame so dialogs have a mounted route to attach to.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runFirstRunFlow());
+  }
+
+  /// Greet, then offer app-lock — strictly in sequence. Both are one-time and
+  /// showing them at once would stack two modals over an empty dashboard.
+  Future<void> _runFirstRunFlow() async {
+    if (!mounted) return;
+    final wantsToAdd = await maybeShowWelcome(context, ref);
+
+    if (wantsToAdd && mounted) {
+      // Honour the CTA: land them straight on the expense form.
+      await showTransactionSheet(context, type: TxType.expense);
+    }
+
+    if (mounted) await maybeOfferBiometricEnrolment(context, ref);
   }
 
   String _title(AppText t, int index) =>

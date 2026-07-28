@@ -40,8 +40,10 @@ class GoogleAuthService {
       final account = await GoogleSignIn.instance.authenticate();
       final idToken = account.authentication.idToken;
       if (idToken == null || idToken.isEmpty) {
-        // Almost always a misconfigured serverClientId or a missing SHA-1.
-        throw const GoogleAuthUnavailable();
+        // The picker succeeded but Google withheld the token. That means the
+        // OAuth clients are wrong — almost always a missing ANDROID client for
+        // this package + signing certificate.
+        throw const GoogleAuthMisconfigured('no ID token returned');
       }
       return GoogleIdentity(
         idToken: idToken,
@@ -50,9 +52,30 @@ class GoogleAuthService {
         photoUrl: account.photoUrl,
       );
     } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled) return null;
-      if (kDebugMode) print('[GoogleAuth] ${e.code}: ${e.description}');
-      rethrow;
+      if (kDebugMode) {
+        print('[GoogleAuth] ${e.code.name}: ${e.description} ${e.details ?? ''}');
+      }
+      switch (e.code) {
+        case GoogleSignInExceptionCode.canceled:
+        case GoogleSignInExceptionCode.interrupted:
+          // Genuinely dismissed by the user — say nothing.
+          //
+          // Caveat: Android also surfaces some configuration failures as a
+          // cancellation, which is why a misconfigured app "does nothing" on
+          // tap. `description` is the only way to tell them apart.
+          final d = (e.description ?? '').toLowerCase();
+          if (d.contains('credential') || d.contains('10:') || d.contains('developer')) {
+            throw GoogleAuthMisconfigured(e.description ?? e.code.name);
+          }
+          return null;
+        case GoogleSignInExceptionCode.clientConfigurationError:
+        case GoogleSignInExceptionCode.providerConfigurationError:
+          throw GoogleAuthMisconfigured(e.description ?? e.code.name);
+        case GoogleSignInExceptionCode.uiUnavailable:
+          throw const GoogleAuthUnavailable();
+        default:
+          throw GoogleAuthMisconfigured('${e.code.name}: ${e.description ?? ''}');
+      }
     }
   }
 
@@ -82,8 +105,20 @@ class GoogleIdentity {
   });
 }
 
-/// Google Play Services missing, or the OAuth client is not configured for
-/// this build's signing certificate.
+/// Google Play Services is missing or cannot show its UI on this device.
 class GoogleAuthUnavailable implements Exception {
   const GoogleAuthUnavailable();
+}
+
+/// Sign-in reached Google but the OAuth clients are wrong for this build —
+/// typically no ANDROID client registered for this package + SHA-1, or a
+/// `serverClientId` from a different project.
+///
+/// Surfaced rather than swallowed: Android reports this as a cancellation, so
+/// treating it as one makes the button appear to do nothing at all.
+class GoogleAuthMisconfigured implements Exception {
+  final String detail;
+  const GoogleAuthMisconfigured(this.detail);
+  @override
+  String toString() => 'GoogleAuthMisconfigured: $detail';
 }

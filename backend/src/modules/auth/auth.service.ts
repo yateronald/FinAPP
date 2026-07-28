@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Logger,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -15,6 +16,7 @@ import {
 } from '../../common/constants/default-categories';
 import { MailService } from '../mail/mail.service';
 import { AuditService } from '../audit/audit.service';
+import { EngagementService } from '../notifications/engagement.service';
 import { DeviceContext, TokenService } from './token.service';
 import {
   ForgotPasswordDto,
@@ -26,12 +28,15 @@ import {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: TokenService,
     private readonly mail: MailService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    private readonly welcome: EngagementService,
   ) {}
 
   /**
@@ -482,6 +487,15 @@ export class AuthService {
   // --------------------------------------------------------------- Internals
   private async completeLogin(userId: string, email: string, role: any, device: DeviceContext) {
     const pair = await this.tokens.generateTokens({ sub: userId, email, role }, device);
+
+    // Read lastLoginAt BEFORE overwriting it — a null value is the only
+    // reliable signal that this is the very first sign-in.
+    const before = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { lastLoginAt: true, firstName: true },
+    });
+    const isFirstLogin = before?.lastLoginAt == null;
+
     await this.prisma.user.update({
       where: { id: userId },
       data: { lastLoginAt: new Date() },
@@ -503,7 +517,14 @@ export class AuthService {
       },
     });
 
-    return { user, ...pair };
+    if (isFirstLogin && role !== 'ADMIN') {
+      // Fire-and-forget: a welcome message must never be able to fail a login.
+      this.welcome.sendWelcome(userId, before?.firstName ?? null).catch((e) => {
+        this.logger.warn(`Welcome notification failed for ${userId}: ${(e as Error).message}`);
+      });
+    }
+
+    return { user, ...pair, isFirstLogin };
   }
 
   private async issueOtp(
