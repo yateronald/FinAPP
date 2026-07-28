@@ -1,0 +1,29 @@
+# ===========================================================================
+# Repository-wide ignores. Per-project rules live in backend/, web/, mobile/.
+# ===========================================================================
+
+# --- Secrets -----------------------------------------------------------
+# The deploy script carries the production database password and the live
+# Gemini / AgentRouter keys. It must never reach GitHub.
+backend_finance.sh
+*.secrets.env
+serviceAccount.json
+.env
+.env.*
+!.env.example
+
+# --- Local dumps & backups ---------------------------------------------
+*.dump
+*.sql.gz
+backups/
+
+# --- Logs ---------------------------------------------------------------
+*.log
+logs/
+
+# --- OS / editor --------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
