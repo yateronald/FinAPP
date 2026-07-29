@@ -14,10 +14,15 @@ import '../providers/auth_provider.dart';
 /// silently create an account on sign-in, or silently sign in on sign-up, and
 /// reports which happened so we can point the user at the other screen.
 class GoogleAuthButton extends ConsumerStatefulWidget {
-  const GoogleAuthButton({super.key, required this.intent});
+  const GoogleAuthButton({super.key, required this.intent, this.canProceed});
 
   /// 'signin' or 'signup'.
   final String intent;
+
+  /// Gate checked before the Google flow starts. Returning false aborts it —
+  /// used on the sign-up screen so creating an account through Google still
+  /// requires accepting the Terms, exactly like the email form does.
+  final bool Function()? canProceed;
 
   @override
   ConsumerState<GoogleAuthButton> createState() => _GoogleAuthButtonState();
@@ -29,6 +34,10 @@ class _GoogleAuthButtonState extends ConsumerState<GoogleAuthButton> {
   bool get _isSignUp => widget.intent == 'signup';
 
   Future<void> _run() async {
+    // Consent must be given before an account can be created, whichever
+    // sign-up route the user takes.
+    if (widget.canProceed != null && !widget.canProceed!()) return;
+
     setState(() => _loading = true);
     try {
       final identity = await GoogleAuthService.instance.signIn();

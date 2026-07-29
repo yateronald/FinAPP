@@ -10,6 +10,7 @@ import '../../auth/data/user_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../categories/presentation/categories_screen.dart';
 import '../providers/settings_provider.dart';
+import 'delete_account_flow.dart';
 import 'change_password_sheet.dart';
 import 'edit_profile_sheet.dart';
 
@@ -234,9 +235,38 @@ class SettingsScreen extends ConsumerWidget {
               () => ref.read(authProvider.notifier).logout(),
               color: AppColors.danger),
         ]),
+        const SizedBox(height: 20),
+
+        // Separated from the rest: irreversible, and should never sit one
+        // mis-tap away from an ordinary setting.
+        _sectionLabel(t.dangerZone),
+        _card(context, [
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            leading: const Icon(Icons.delete_forever_rounded, color: AppColors.danger),
+            title: Text(t.deleteAccount,
+                style: const TextStyle(
+                    color: AppColors.danger, fontWeight: FontWeight.w600)),
+            subtitle: Text(t.deleteAccountSubtitle,
+                style: TextStyle(fontSize: 11.5, color: context.muted)),
+            trailing: Icon(Icons.chevron_right_rounded, color: context.muted),
+            onTap: () => runDeleteAccountFlow(context, ref),
+          ),
+        ]),
         const SizedBox(height: 24),
         Center(
-          child: Text('Fynexa · v1.0.0', style: TextStyle(color: context.muted, fontSize: 12)),
+          child: Column(
+            children: [
+              Text('Fynexa · v1.0.0',
+                  style: TextStyle(color: context.muted, fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(t.developedBy,
+                  style: TextStyle(
+                      color: context.muted,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500)),
+            ],
+          ),
         ),
       ],
       ),

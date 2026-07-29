@@ -8,6 +8,8 @@ import {
   Length,
   MaxLength,
   MinLength,
+  IsBoolean,
+  Equals,
 } from 'class-validator';
 import { Language } from '@prisma/client';
 
@@ -50,6 +52,17 @@ export class RegisterDto {
   @IsString()
   @MaxLength(8)
   currency?: string;
+
+  @ApiProperty({
+    description:
+      'Must be true. The user has read and accepted the Terms of Use and Privacy Policy.',
+    example: true,
+  })
+  @IsBoolean()
+  @Equals(true, {
+    message: 'You must accept the Terms of Use and Privacy Policy to create an account',
+  })
+  acceptedTerms!: boolean;
 }
 
 export class LoginDto {

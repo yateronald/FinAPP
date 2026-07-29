@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,7 @@ import '../data/user_model.dart';
 import '../providers/auth_provider.dart';
 import 'auth_widgets.dart';
 import 'google_auth_button.dart';
+import 'legal_screen.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -71,6 +73,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             language: lang,
             country: _country?.$2,
             currency: _currency.$1,
+            acceptedTerms: _accepted,
           );
       if (!mounted) return;
       // No verification step when the server has no mail configured — it hands
@@ -382,7 +385,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      const GoogleAuthButton(intent: 'signup'),
+                      GoogleAuthButton(
+                        intent: 'signup',
+                        // Same consent gate as the email form.
+                        canProceed: () {
+                          if (_accepted) return true;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(context.t.mustAcceptTerms)),
+                          );
+                          return false;
+                        },
+                      ),
                       const SizedBox(height: 14),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -572,9 +585,22 @@ class _TermsRow extends StatelessWidget {
                 style: TextStyle(fontSize: 12.5, color: context.colors.onSurface, height: 1.4),
                 children: [
                   TextSpan(text: t.acceptPrefix),
-                  TextSpan(text: t.termsOfUse, style: linkStyle),
+                  // Tappable: consent is not informed if the text cannot be read.
+                  TextSpan(
+                    text: t.termsOfUse,
+                    style: linkStyle,
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () =>
+                          showLegalDocument(context, LegalDocument.terms),
+                  ),
                   TextSpan(text: t.acceptMiddle),
-                  TextSpan(text: t.privacyPolicy, style: linkStyle),
+                  TextSpan(
+                    text: t.privacyPolicy,
+                    style: linkStyle,
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () =>
+                          showLegalDocument(context, LegalDocument.privacy),
+                  ),
                   const TextSpan(text: '.'),
                 ],
               ),

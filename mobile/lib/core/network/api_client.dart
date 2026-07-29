@@ -164,9 +164,11 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> delete(String path) async {
+  /// [body] is needed by endpoints that require an explicit confirmation
+  /// payload, such as permanent account deletion.
+  Future<dynamic> delete(String path, {Map<String, dynamic>? body}) async {
     try {
-      final res = await _dio.delete(path);
+      final res = await _dio.delete(path, data: body);
       return _unwrap(res);
     } on DioException catch (e) {
       throw _toException(e);

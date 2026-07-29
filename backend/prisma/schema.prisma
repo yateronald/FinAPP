@@ -106,6 +106,12 @@ model User {
   /// Forces a password change on the next login (set after an admin reset).
   mustChangePassword Boolean  @default(false) @map("must_change_password")
   passwordChangedAt  DateTime? @map("password_changed_at")
+
+  // Proof of consent. Versions are stored so that publishing a new policy can
+  // re-prompt only the users who accepted an older one.
+  termsAcceptedAt    DateTime? @map("terms_accepted_at")
+  termsVersion       String?   @map("terms_version")
+  privacyVersion     String?   @map("privacy_version")
   /// Who disabled the account and why (null while active).
   disabledAt         DateTime? @map("disabled_at")
   disabledReason     String?   @map("disabled_reason")

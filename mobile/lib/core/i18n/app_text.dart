@@ -451,6 +451,59 @@ class AppText {
         'Set a budget per category to receive AI recommendations.',
       );
 
+  String get developedBy =>
+      _s('Développé par YATE RONALD', 'Developed by YATE RONALD');
+
+  // ------------------------------------------------- Account deletion
+  String get deleteAccount => _s('Supprimer mon compte', 'Delete my account');
+  String get deleteAccountSubtitle => _s(
+        'Efface définitivement votre compte et toutes vos données',
+        'Permanently erases your account and all your data',
+      );
+  String get dangerZone => _s('Zone sensible', 'Danger zone');
+
+  // Step 1 — what will be lost
+  String get deleteAccountStep1Title =>
+      _s('Supprimer votre compte ?', 'Delete your account?');
+  String get deleteAccountStep1Body => _s(
+        'Tout sera effacé définitivement de nos serveurs. '
+            'Cette action ne peut pas être annulée et vos données ne pourront pas être récupérées.',
+        'Everything will be permanently erased from our servers. This cannot be '
+            'undone and your data cannot be recovered.',
+      );
+  String deleteAccountCount(int n, String label) => '$n $label';
+  String get deleteAccountExpenses => _s('dépenses', 'expenses');
+  String get deleteAccountIncomes => _s('revenus', 'income entries');
+  String get deleteAccountBudgets => _s('budgets', 'budgets');
+  String get deleteAccountCategories => _s('catégories', 'categories');
+  String get deleteAccountInsights => _s('analyses IA', 'AI insights');
+  String get deleteAccountContinue => _s('Continuer', 'Continue');
+
+  // Step 2 — typed confirmation
+  String get deleteAccountStep2Title =>
+      _s('Dernière confirmation', 'Final confirmation');
+  /// The word the user must type. Kept uppercase and matched case-insensitively.
+  String get deleteAccountKeyword => _s('SUPPRIMER', 'DELETE');
+  String get deleteAccountStep2Body => _s(
+        'Pour confirmer la suppression définitive, tapez SUPPRIMER ci-dessous.',
+        'To confirm permanent deletion, type DELETE below.',
+      );
+  String get deleteAccountTypeHint =>
+      _s('Tapez SUPPRIMER', 'Type DELETE');
+  String get deleteAccountMismatch =>
+      _s('Le mot ne correspond pas', 'The word does not match');
+  String get deleteAccountConfirmButton =>
+      _s('Supprimer définitivement', 'Delete permanently');
+  String get deleteAccountDoneTitle =>
+      _s('Compte supprimé', 'Account deleted');
+  String get deleteAccountDone => _s(
+        'Votre compte et toutes vos données ont été définitivement supprimés '
+            'de nos serveurs.',
+        'Your account and all your data have been completely deleted from our '
+            'servers.',
+      );
+  String get backToLogin => _s('Retour à la connexion', 'Back to sign in');
+
   // --------------------------------------------------- First-run welcome
   String welcomeTitle(String? name) => (name == null || name.isEmpty)
       ? _s('Bienvenue sur Fynexa 👋', 'Welcome to Fynexa 👋')

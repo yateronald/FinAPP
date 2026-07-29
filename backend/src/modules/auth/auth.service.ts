@@ -16,6 +16,7 @@ import {
 } from '../../common/constants/default-categories';
 import { MailService } from '../mail/mail.service';
 import { AuditService } from '../audit/audit.service';
+import { PRIVACY_VERSION, TERMS_VERSION } from '../../common/constants/legal';
 import { EngagementService } from '../notifications/engagement.service';
 import { DeviceContext, TokenService } from './token.service';
 import {
@@ -71,6 +72,10 @@ export class AuthService {
           lastName: dto.lastName,
           country: dto.country,
           emailVerified: !needsVerification,
+          // Proof of consent, recorded at the moment of acceptance.
+          termsAcceptedAt: new Date(),
+          termsVersion: TERMS_VERSION,
+          privacyVersion: PRIVACY_VERSION,
           settings: {
             create: {
               language: dto.language ?? Language.EN,
@@ -326,6 +331,11 @@ export class AuthService {
           avatarUrl: profile.avatarUrl,
           // Google already proved ownership of the mailbox.
           emailVerified: true,
+          // Signing up through Google still requires acceptance — the client
+          // shows the same consent step before calling with intent=signup.
+          termsAcceptedAt: new Date(),
+          termsVersion: TERMS_VERSION,
+          privacyVersion: PRIVACY_VERSION,
           settings: {
             create: { currency: this.config.get<string>('defaultCurrency') ?? 'XOF' },
           },

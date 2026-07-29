@@ -23,6 +23,7 @@ class AuthRepository {
     String language = 'FR',
     String? country,
     String? currency,
+    required bool acceptedTerms,
   }) async {
     final data = await _api.post('/auth/register', body: {
       'email': email,
@@ -32,6 +33,8 @@ class AuthRepository {
       'language': language,
       if (country != null && country.isNotEmpty) 'country': country,
       if (currency != null && currency.isNotEmpty) 'currency': currency,
+      // Recorded server-side with the document versions in force.
+      'acceptedTerms': acceptedTerms,
     }, auth: false);
     final map = Map<String, dynamic>.from(data);
     // When the server has no mail configured it skips the OTP and hands back a
