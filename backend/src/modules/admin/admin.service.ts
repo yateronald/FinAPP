@@ -9,6 +9,7 @@ import { Prisma, Role } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TokenService } from '../auth/token.service';
+import { MailService } from '../mail/mail.service';
 import {
   AuditLogQueryDto,
   CreateAdminDto,
@@ -38,7 +39,20 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: TokenService,
+    private readonly mail: MailService,
   ) {}
+
+  /**
+   * Admin-initiated password reset is only safe once mail is configured.
+   *
+   * The temporary password is displayed exactly once and is never stored in
+   * readable form. With no way to email it, an admin who closes the dialog
+   * without copying it has locked the user out of a real account with no
+   * recovery path. Disabled until SMTP exists; it then re-enables itself.
+   */
+  get passwordResetEnabled(): boolean {
+    return this.mail.isConfigured;
+  }
 
   // ------------------------------------------------------------- Audit
   /** Append-only record of an admin action. Never throws into the caller. */
@@ -169,6 +183,9 @@ export class AdminService {
       },
       signupsByDay: [...byDay.entries()].map(([date, count]) => ({ date, count })),
       trends,
+      // Lets the dashboard hide actions that would only fail — better than
+      // offering a button that returns an error when pressed.
+      capabilities: { passwordReset: this.passwordResetEnabled },
     };
   }
 
@@ -281,6 +298,15 @@ export class AdminService {
    * The temp password is returned ONCE and never stored in plain text.
    */
   async resetPassword(actorId: string, targetId: string) {
+    if (!this.passwordResetEnabled) {
+      throw new BadRequestException({
+        message:
+          'Password reset is disabled until an SMTP server is configured — the ' +
+          'temporary password could not be delivered to the user.',
+        code: 'PASSWORD_RESET_DISABLED',
+      });
+    }
+
     const target = await this.prisma.user.findFirst({
       where: { id: targetId, deletedAt: null },
       select: { id: true, email: true },

@@ -451,6 +451,28 @@ class AppText {
         'Set a budget per category to receive AI recommendations.',
       );
 
+  // --------------------------------------- Terms re-acceptance prompt
+  String get termsUpdateTitle =>
+      _s('Conditions mises à jour', 'Updated terms');
+  String get termsUpdateBody => _s(
+        'Nous avons publié nos Conditions d’utilisation et notre Politique de '
+            'confidentialité. Merci de les lire et de les accepter pour continuer '
+            'à utiliser Fynexa.',
+        'We have published our Terms of Use and Privacy Policy. Please read and '
+            'accept them to continue using Fynexa.',
+      );
+  String get termsUpdateRead =>
+      _s('Appuyez pour lire :', 'Tap to read:');
+  String get termsUpdateAcceptLabel => _s(
+        'J’ai lu et j’accepte les Conditions d’utilisation et la Politique de confidentialité.',
+        'I have read and accept the Terms of Use and Privacy Policy.',
+      );
+  String get termsUpdateAccept => _s('Accepter et continuer', 'Accept and continue');
+  String get termsUpdateMustRead => _s(
+        'Ouvrez les deux documents avant d’accepter.',
+        'Please open both documents before accepting.',
+      );
+
   String get developedBy =>
       _s('Développé par YATE RONALD', 'Developed by YATE RONALD');
 

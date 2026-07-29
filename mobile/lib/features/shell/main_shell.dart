@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
 import '../ai/presentation/ai_screen.dart';
 import '../auth/presentation/biometric_prompt.dart';
+import '../auth/presentation/terms_acceptance_gate.dart';
 import '../auth/presentation/welcome_sheet.dart';
 import '../auth/providers/auth_provider.dart';
 import '../budgets/presentation/budgets_screen.dart';
@@ -40,6 +41,12 @@ class _MainShellState extends ConsumerState<MainShell> {
   /// showing them at once would stack two modals over an empty dashboard.
   Future<void> _runFirstRunFlow() async {
     if (!mounted) return;
+
+    // Consent comes first and blocks: accounts created before consent was
+    // recorded must accept the published documents before anything else.
+    await maybePromptTermsAcceptance(context, ref);
+    if (!mounted) return;
+
     final wantsToAdd = await maybeShowWelcome(context, ref);
 
     if (wantsToAdd && mounted) {

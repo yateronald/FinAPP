@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Patch } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UsersService } from './users.service';
@@ -20,6 +29,18 @@ export class UsersController {
   @ApiOperation({ summary: 'Update current user profile' })
   updateMe(@CurrentUser('userId') userId: string, @Body() dto: UpdateProfileDto) {
     return this.users.updateProfile(userId, dto);
+  }
+
+  @Post('me/accept-terms')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Record acceptance of the current Terms and Privacy Policy',
+    description:
+      'Used by the one-time prompt shown to accounts that predate consent recording, ' +
+      'or that accepted an earlier revision.',
+  })
+  acceptTerms(@CurrentUser('userId') userId: string) {
+    return this.users.acceptTerms(userId);
   }
 
   @Get('me/deletion-impact')

@@ -3,6 +3,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TokenService } from '../auth/token.service';
 import { UpdateProfileDto } from './dto/user.dto';
+import { PRIVACY_VERSION, TERMS_VERSION } from '../../common/constants/legal';
 
 @Injectable()
 export class UsersService {
@@ -31,12 +32,51 @@ export class UsersService {
         // client can offer "Set a password" instead of "Change password".
         passwordHash: true,
         googleId: true,
+        termsAcceptedAt: true,
+        termsVersion: true,
+        privacyVersion: true,
       },
     });
     if (!user) throw new NotFoundException('User not found');
 
     const { passwordHash, googleId, ...safe } = user;
-    return { ...safe, hasPassword: !!passwordHash, hasGoogle: !!googleId };
+    return {
+      ...safe,
+      hasPassword: !!passwordHash,
+      hasGoogle: !!googleId,
+      // True for accounts predating consent recording, and for anyone who
+      // accepted an earlier revision — the same check covers both, so a future
+      // policy update re-prompts only the users who have not seen it.
+      needsTermsAcceptance:
+        user.termsVersion !== TERMS_VERSION || user.privacyVersion !== PRIVACY_VERSION,
+      currentTermsVersion: TERMS_VERSION,
+      currentPrivacyVersion: PRIVACY_VERSION,
+    };
+  }
+
+  /** Records acceptance of the documents currently in force. */
+  async acceptTerms(userId: string) {
+    const now = new Date();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        termsAcceptedAt: now,
+        termsVersion: TERMS_VERSION,
+        privacyVersion: PRIVACY_VERSION,
+      },
+    });
+    await this.audit.log({
+      userId,
+      action: 'TERMS_ACCEPTED',
+      entity: 'User',
+      entityId: userId,
+      metadata: { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION },
+    });
+    return {
+      acceptedAt: now.toISOString(),
+      termsVersion: TERMS_VERSION,
+      privacyVersion: PRIVACY_VERSION,
+    };
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
