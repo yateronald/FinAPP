@@ -123,6 +123,8 @@ export default function AdminUsersPage() {
   const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(null);
 
   const s = stats?.users;
+  // Absent on an older backend → assume enabled rather than hiding a working action.
+  const canResetPassword = stats?.capabilities?.passwordReset ?? true;
   const t = stats?.trends;
   const pct = (n?: number) =>
     s?.total ? `${Math.round(((n ?? 0) / s.total) * 100)}% du total` : '—';
@@ -299,6 +301,9 @@ export default function AdminUsersPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           {u.isActive ? (
                             <>
+                              {/* Hidden until SMTP exists: the temporary password
+                                  is shown once and cannot otherwise be delivered. */}
+                              {canResetPassword && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -315,6 +320,7 @@ export default function AdminUsersPage() {
                                 <KeyRound className="mr-1 h-3 w-3" />
                                 Réinitialiser
                               </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"

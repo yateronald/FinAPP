@@ -39,6 +39,8 @@ export interface AdminStats {
   };
   signupsByDay: { date: string; count: number }[];
   trends: { total: number[]; active: number[]; disabled: number[]; admins: number[] };
+  /** Actions the server will actually accept — password reset needs SMTP. */
+  capabilities?: { passwordReset: boolean };
 }
 
 export interface AuditEntry {
