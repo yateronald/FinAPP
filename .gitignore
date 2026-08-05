@@ -6,6 +6,8 @@
 # The deploy script carries the production database password and the live
 # Gemini / AgentRouter keys. It must never reach GitHub.
 db_finace.sh
+db_to_aiven.sh
+db_to_aiven.sh
 backend_finance.sh
 *.secrets.env
 serviceAccount.json
