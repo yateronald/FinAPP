@@ -457,7 +457,11 @@ export class AiChatService {
     const language = settings?.language ?? 'FR';
     const fr = language === 'FR';
 
-    // Pick the AI provider the user selected (Gemini / AgentRouter), with fallback.
+    // Pick the AI provider the user selected (Gemini / AgentRouter).
+    //
+    // Deliberately no automatic switching to the other provider on a rate
+    // limit: choosing which AI processes their financial data is the user's
+    // decision, so we report the limit and point them at Settings instead.
     const { provider, name: providerName } = this.llm.provider(settings?.aiProvider);
     const other = providerName === 'GEMINI' ? 'AgentRouter' : 'Gemini';
     // Resolve the specific model the user picked for that provider.

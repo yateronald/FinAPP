@@ -13,6 +13,7 @@ import { UsersModule } from './modules/users/users.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { IncomeModule } from './modules/income/income.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
+import { LoansModule } from './modules/loans/loans.module';
 import { BudgetsModule } from './modules/budgets/budgets.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AiModule } from './modules/ai/ai.module';
@@ -50,6 +51,7 @@ import { AdminModule } from './modules/admin/admin.module';
     CategoriesModule,
     IncomeModule,
     ExpensesModule,
+    LoansModule,
     BudgetsModule,
     DashboardModule,
     AiModule,

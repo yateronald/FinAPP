@@ -95,3 +95,10 @@
  GET /admin/users 200 in 97ms
  ✓ Compiled in 318ms (943 modules)
  GET /admin/users 200 in 66ms
+ ✓ Compiled in 1220ms (2004 modules)
+ ✓ Compiled in 193ms (943 modules)
+ ✓ Compiled in 186ms (943 modules)
+ ✓ Compiled in 232ms (943 modules)
+ ✓ Compiled in 209ms (943 modules)
+ ✓ Compiled in 3.1s (2004 modules)
+ ✓ Compiled in 969ms (2004 modules)

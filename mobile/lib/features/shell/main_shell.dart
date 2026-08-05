@@ -15,6 +15,7 @@ import '../budgets/presentation/budgets_screen.dart';
 import '../budgets/presentation/set_budget_sheet.dart';
 import '../dashboard/presentation/dashboard_screen.dart';
 import '../dashboard/providers/dashboard_provider.dart';
+import '../loans/presentation/loans_screen.dart';
 import '../notifications/notifications_feature.dart';
 import '../reports/reports_feature.dart';
 import '../transactions/data/transaction_models.dart';
@@ -57,8 +58,13 @@ class _MainShellState extends ConsumerState<MainShell> {
     if (mounted) await maybeOfferBiometricEnrolment(context, ref);
   }
 
-  String _title(AppText t, int index) =>
-      [t.titleHome, t.titleFinances, t.titleBudgets, t.titleAi][index];
+  String _title(AppText t, int index) => [
+        t.titleHome,
+        t.titleFinances,
+        t.titleBudgets,
+        t.titleAi,
+        t.titleLoans,
+      ][index];
 
   Widget _body(int index) {
     switch (index) {
@@ -68,6 +74,8 @@ class _MainShellState extends ConsumerState<MainShell> {
         return const FinancesScreen();
       case 2:
         return const BudgetsScreen();
+      case 4:
+        return const LoansScreen();
       default:
         return const AiScreen();
     }
@@ -252,7 +260,9 @@ class _SideRail extends StatelessWidget {
     return NavigationRail(
       selectedIndex: index,
       // The 5th destination (Reports) is a pushed screen, not a shell tab.
-      onDestinationSelected: (i) => i == 4 ? onReports() : onTap(i),
+      // Reports is a pushed route, not a tab — it moved to slot 5 when Loans
+      // was inserted at 4.
+      onDestinationSelected: (i) => i == 5 ? onReports() : onTap(i),
       labelType: NavigationRailLabelType.all,
       backgroundColor: context.colors.surface,
       indicatorColor: AppColors.primary.withValues(alpha: 0.12),
@@ -291,6 +301,12 @@ class _SideRail extends StatelessWidget {
           icon: const Icon(Icons.auto_awesome_outlined),
           selectedIcon: const Icon(Icons.auto_awesome_rounded),
           label: Text(t.navAiShort),
+        ),
+        // Index 4 — must match the tab order in _body().
+        NavigationRailDestination(
+          icon: const Icon(Icons.account_balance_outlined),
+          selectedIcon: const Icon(Icons.account_balance_rounded),
+          label: Text(t.navLoans),
         ),
         NavigationRailDestination(
           icon: const Icon(Icons.bar_chart_rounded),
@@ -345,6 +361,8 @@ class _BottomBar extends StatelessWidget {
                 _item(context, 0, Icons.home_rounded, Icons.home_outlined, t.navHome),
                 _item(context, 1, Icons.swap_vert_rounded, Icons.swap_vert_rounded, t.navFinances),
                 _item(context, 2, Icons.savings_rounded, Icons.savings_outlined, t.navBudgets),
+                _item(context, 4, Icons.account_balance_rounded,
+                    Icons.account_balance_outlined, t.navLoans),
                 _action(context, Icons.bar_chart_rounded, t.reports, onReports),
                 _item(context, 3, Icons.auto_awesome_rounded, Icons.auto_awesome_outlined,
                     t.navAiShort),
@@ -397,7 +415,7 @@ class _BottomBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Icon(icon, color: color, size: 21),
             ),
             const SizedBox(height: 2),
@@ -424,7 +442,7 @@ class _BottomBar extends StatelessWidget {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: selected ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),

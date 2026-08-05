@@ -14,6 +14,8 @@ import '../../categories/providers/categories_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 import '../data/transaction_models.dart';
 import '../data/transaction_repository.dart';
+import '../../loans/presentation/loan_payment_field.dart';
+import '../../loans/providers/loans_provider.dart';
 import '../providers/transactions_provider.dart';
 
 /// Opens the add/edit transaction bottom sheet. Returns true if saved.
@@ -51,6 +53,10 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
 
   bool get _isEdit => widget.existing != null;
   String get _catType => widget.type == TxType.income ? 'INCOME' : 'EXPENSE';
+
+  /// Loan repayment link — expenses only. Income can never repay a loan.
+  bool _isLoanPayment = false;
+  String? _loanId;
 
   @override
   void initState() {
@@ -97,6 +103,8 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
       amount: double.parse(_amount.text.replaceAll(RegExp(r'[^0-9.]'), '')),
       date: _date,
       description: _note.text.trim(),
+      // '' clears an existing link when the box is unticked while editing.
+      loanId: widget.type.isIncome ? null : (_isLoanPayment ? _loanId : ''),
     );
     try {
       final repo = ref.read(transactionRepositoryProvider);
@@ -106,6 +114,8 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
       ref.invalidate(transactionsProvider(widget.type));
       ref.invalidate(financeOverviewProvider(widget.type));
       ref.invalidate(dashboardProvider);
+      // Loan progress is derived from expenses, so it must be re-read.
+      if (!widget.type.isIncome) refreshLoansFrom(ref);
       if (result == WriteResult.queued) {
         await ref.read(syncEngineProvider).refreshCount();
       }
@@ -309,6 +319,19 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
                   maxLines: 2,
                   decoration: InputDecoration(labelText: context.t.noteOptional),
                 ),
+                // Expenses only — repaying a loan is never income.
+                if (!widget.type.isIncome) ...[
+                  const SizedBox(height: 16),
+                  LoanPaymentField(
+                    checked: _isLoanPayment,
+                    selectedLoanId: _loanId,
+                    onCheckedChanged: (v) => setState(() {
+                      _isLoanPayment = v;
+                      if (!v) _loanId = null;
+                    }),
+                    onLoanSelected: (id) => setState(() => _loanId = id),
+                  ),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 14),
                   Row(

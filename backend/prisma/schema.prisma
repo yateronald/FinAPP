@@ -131,6 +131,7 @@ model User {
   otps              OtpCode[]
   auditLogs         AuditLog[]
   fcmTokens         FcmToken[]
+  loans             Loan[]
   settings          UserSettings?
 
   @@index([email])
@@ -272,13 +273,66 @@ model Expense {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   deletedAt     DateTime? @map("deleted_at")
 
+  // Set when this expense repays a loan. Loan progress is derived from these
+  // rows rather than duplicated into a payments table, so the ledger and the
+  // loan balance can never drift apart.
+  loanId        String?   @map("loan_id")
+
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   category      Category  @relation(fields: [categoryId], references: [id])
+  loan          Loan?     @relation(fields: [loanId], references: [id], onDelete: SetNull)
 
   @@index([userId, date])
   @@index([userId, categoryId])
+  @@index([userId, loanId])
   @@index([deletedAt])
   @@map("expenses")
+}
+
+// --------------------------------------------------------------------------
+// Loans
+// --------------------------------------------------------------------------
+
+enum LoanStatus {
+  ACTIVE
+  PAID_OFF
+  ARCHIVED
+}
+
+/// A debt the user is repaying.
+///
+/// The amount repaid is NOT stored — it is the sum of `initialPaidAmount`
+/// (whatever was already paid before tracking began) plus every expense linked
+/// to this loan. A stored running total would eventually disagree with the
+/// transactions after an edit or deletion.
+model Loan {
+  id                String     @id @default(uuid())
+  userId            String     @map("user_id")
+
+  name              String
+  description       String?
+  lender            String?
+
+  /// Total borrowed.
+  principalAmount   Decimal    @db.Decimal(14, 2) @map("principal_amount")
+  /// Already repaid before the loan was added to the app.
+  initialPaidAmount Decimal    @default(0) @db.Decimal(14, 2) @map("initial_paid_amount")
+
+  startDate         DateTime   @map("start_date")
+  expectedEndDate   DateTime?  @map("expected_end_date")
+
+  status            LoanStatus @default(ACTIVE)
+
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  deletedAt         DateTime?  @map("deleted_at")
+
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments          Expense[]
+
+  @@index([userId, status])
+  @@index([deletedAt])
+  @@map("loans")
 }
 
 // --------------------------------------------------------------------------

@@ -53,6 +53,14 @@ export class CreateExpenseDto {
   @IsOptional()
   @IsString()
   receiptUrl?: string;
+  @ApiPropertyOptional({
+    description:
+      'Set when this expense repays a loan. The loan must be active and owned by the caller.',
+  })
+  @IsOptional()
+  @IsString()
+  loanId?: string;
+
 }
 
 export class UpdateExpenseDto {
@@ -100,6 +108,14 @@ export class UpdateExpenseDto {
   @IsOptional()
   @IsString()
   receiptUrl?: string;
+  @ApiPropertyOptional({
+    description:
+      'Set when this expense repays a loan. The loan must be active and owned by the caller.',
+  })
+  @IsOptional()
+  @IsString()
+  loanId?: string;
+
 }
 
 export class QueryExpenseDto {

@@ -19,19 +19,23 @@ export const AI_MODELS: Record<AiProvider, AiModelOption[]> = {
     { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
     { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro' },
   ],
+  // Only what the AgentRouter account actually provisions. Offering a model
+  // that is not on the key produced a 503 "无可用渠道" (no available channel),
+  // which reached the user as an unexplained failure.
   AGENTROUTER: [
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6' },
+    { id: 'claude-opus-5', label: 'Claude Opus 5' },
     { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
-    { id: 'claude-opus-4-7', label: 'Claude Opus 4.7' },
-    { id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
-    { id: 'glm-5.2', label: 'GLM 5.2' },
-    { id: 'gpt-5.5', label: 'GPT-5.5' },
   ],
 };
 
 export const DEFAULT_MODEL: Record<AiProvider, string> = {
   GEMINI: 'gemini-3.5-flash',
-  AGENTROUTER: 'claude-opus-4-8',
+  // GPT-5.6 answers most reliably on this key; the Claude models hit
+  // AgentRouter's shared token ceiling far more often.
+  AGENTROUTER: 'gpt-5.6-sol',
 };
+
 
 export const GEMINI_MODEL_IDS = AI_MODELS.GEMINI.map((m) => m.id);
 export const AGENTROUTER_MODEL_IDS = AI_MODELS.AGENTROUTER.map((m) => m.id);

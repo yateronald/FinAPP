@@ -14,12 +14,16 @@ class TransactionInput {
   final DateTime date;
   final String? description;
 
+  /// Set when this expense repays a loan. Income never carries one.
+  final String? loanId;
+
   TransactionInput({
     required this.title,
     required this.categoryId,
     required this.amount,
     required this.date,
     this.description,
+    this.loanId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -28,6 +32,9 @@ class TransactionInput {
         'amount': amount,
         'date': Dates.iso(date),
         if (description != null && description!.trim().isNotEmpty) 'description': description,
+        // Always sent on edit so clearing the checkbox unlinks the payment;
+        // an empty string is how the API expresses "no loan".
+        if (loanId != null) 'loanId': loanId,
       };
 }
 

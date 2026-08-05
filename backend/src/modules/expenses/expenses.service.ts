@@ -4,6 +4,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { BudgetEngineService } from '../budgets/budget-engine.service';
 import { DashboardService } from '../dashboard/dashboard.service';
+import { LoansService } from '../loans/loans.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateExpenseDto, QueryExpenseDto, UpdateExpenseDto } from './dto/expense.dto';
 
@@ -15,6 +16,7 @@ export class ExpensesService {
     private readonly budgetEngine: BudgetEngineService,
     private readonly dashboard: DashboardService,
     private readonly notifications: NotificationsService,
+    private readonly loans: LoansService,
   ) {}
 
   private pctChange(current: number, previous: number): number {
@@ -170,6 +172,9 @@ export class ExpensesService {
 
   async create(userId: string, dto: CreateExpenseDto) {
     await this.assertCategory(userId, dto.categoryId);
+    // Ownership is re-checked server-side: a loanId from the client is never
+    // trusted, or one user could credit payments against another's loan.
+    if (dto.loanId) await this.loans.assertPayable(userId, dto.loanId);
     const date = new Date(dto.date);
     const expense = await this.prisma.expense.create({
       data: {
@@ -180,6 +185,7 @@ export class ExpensesService {
         date,
         description: dto.description,
         paymentMethod: dto.paymentMethod,
+        loanId: dto.loanId ?? null,
         tags: dto.tags ?? [],
         receiptUrl: dto.receiptUrl,
       },
@@ -274,6 +280,7 @@ export class ExpensesService {
   async update(userId: string, id: string, dto: UpdateExpenseDto) {
     await this.findOne(userId, id);
     if (dto.categoryId) await this.assertCategory(userId, dto.categoryId);
+    if (dto.loanId) await this.loans.assertPayable(userId, dto.loanId);
     const expense = await this.prisma.expense.update({
       where: { id },
       data: {
@@ -283,6 +290,8 @@ export class ExpensesService {
         ...(dto.date !== undefined ? { date: new Date(dto.date) } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
         ...(dto.paymentMethod !== undefined ? { paymentMethod: dto.paymentMethod } : {}),
+        // An empty string clears the link; undefined leaves it untouched.
+        ...(dto.loanId !== undefined ? { loanId: dto.loanId || null } : {}),
         ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
         ...(dto.receiptUrl !== undefined ? { receiptUrl: dto.receiptUrl } : {}),
       },

@@ -43,6 +43,75 @@ class AppText {
   String get notifications => _s('Notifications', 'Notifications');
   String get categories => _s('Catégories', 'Categories');
 
+  // ------------------------------------------------------------- Loans
+  /// Short label for the bottom navigation.
+  String get navLoans => _s('Prêts', 'Loans');
+  String get titleLoans => _s('Mes prêts', 'My loans');
+  String get loanNew => _s('Nouveau prêt', 'New loan');
+  String get loanEdit => _s('Modifier le prêt', 'Edit loan');
+  String get loanName => _s('Nom du prêt', 'Loan name');
+  String get loanNameHint => _s('Ex. Crédit auto', 'e.g. Car loan');
+  String get loanLender => _s('Prêteur (optionnel)', 'Lender (optional)');
+  String get loanLenderHint => _s('Ex. Ecobank, un proche…', 'e.g. Ecobank, a relative…');
+  String get loanDescription => _s('Description (optionnel)', 'Description (optional)');
+  String get loanPrincipal => _s('Montant total emprunté', 'Total amount borrowed');
+  String get loanAlreadyPaid => _s('Déjà remboursé', 'Already repaid');
+  String get loanAlreadyPaidHelp => _s(
+        'Si vous avez déjà remboursé une partie avant d’utiliser Fynexa, '
+            'indiquez le montant total ici pour un suivi exact.',
+        'If you repaid part of it before using Fynexa, enter the total here so '
+            'the tracking stays accurate.',
+      );
+  String get loanAlreadyPaidTooHigh => _s(
+        'Ne peut pas dépasser le montant emprunté',
+        'Cannot exceed the amount borrowed',
+      );
+  String get loanStartDate => _s('Date de début', 'Start date');
+  String get loanEndDate => _s('Fin prévue', 'Expected end');
+  String get loanNoEndDate => _s('Non définie', 'Not set');
+
+  String get loanRemaining => _s('Restant', 'Remaining');
+  String get loanPaid => _s('Remboursé', 'Repaid');
+  String get loanTotal => _s('Total', 'Total');
+  String get loanPerMonth => _s('/ mois conseillé', 'suggested / month');
+  String loanMonthsLeft(int n) =>
+      _s('$n mois restants', '$n month${n == 1 ? '' : 's'} left');
+  String get loanOverdue => _s('En retard', 'Overdue');
+  String get loanPaidOff => _s('Remboursé ✓', 'Paid off ✓');
+  String get loanActive => _s('En cours', 'Active');
+  String loanPaymentCount(int n) =>
+      _s('$n versement${n > 1 ? 's' : ''}', '$n payment${n == 1 ? '' : 's'}');
+
+  String get loanEmptyTitle => _s('Aucun prêt suivi', 'No loans tracked');
+  String get loanEmptyBody => _s(
+        'Ajoutez un prêt pour suivre ce qu’il vous reste à rembourser, et liez '
+            'vos dépenses à celui-ci pour une progression automatique.',
+        'Add a loan to track what is left to repay, and link your expenses to '
+            'it so progress updates automatically.',
+      );
+  String get loanCreateFirst => _s('Créer un prêt', 'Create a loan');
+  String get loanHistory => _s('Historique des versements', 'Payment history');
+  String get loanNoPayments => _s(
+        'Aucun versement enregistré. Ajoutez une dépense et cochez « Je rembourse un prêt ».',
+        'No payments yet. Add an expense and tick “This repays a loan”.',
+      );
+  String get loanDeleteTitle => _s('Supprimer ce prêt ?', 'Delete this loan?');
+  String get loanDeleteBody => _s(
+        'Le prêt sera supprimé, mais les dépenses liées resteront dans votre '
+            'historique — elles correspondent à de l’argent réellement dépensé.',
+        'The loan will be removed, but its linked expenses stay in your history '
+            '— they are money you really spent.',
+      );
+
+  // Expense → loan link
+  String get expenseIsLoanPayment =>
+      _s('Je rembourse un prêt', 'This repays a loan');
+  String get expenseChooseLoan => _s('Choisir le prêt', 'Choose the loan');
+  String get expenseNoLoanYet => _s(
+        'Vous n’avez aucun prêt enregistré. Créez-en un pour lier ce paiement.',
+        'You have no loans yet. Create one to link this payment.',
+      );
+
   // ---------------------------------------------------- Onboarding
   String get onbSkip => _s('Passer', 'Skip');
   String get onbNext => _s('Suivant', 'Next');
