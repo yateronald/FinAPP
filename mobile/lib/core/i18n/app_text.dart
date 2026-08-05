@@ -331,6 +331,75 @@ class AppText {
   String remainingLabel(String amount) => _s('$amount restants', '$amount left');
   String overLabel(String amount) => _s('$amount de trop', '$amount over');
 
+  // Overall (month-wide) budget — every expense counts against it.
+  String get budgetOverallTitle =>
+      _s('Budget global du mois', 'Overall monthly budget');
+  String get budgetOverallSubtitle => _s(
+        'Toutes vos dépenses du mois y sont comptées, quelle que soit la catégorie.',
+        'Every expense of the month counts against it, whatever its category.',
+      );
+  String get budgetOverallNone =>
+      _s('Aucun budget global', 'No overall budget');
+  String get budgetOverallNoneBody => _s(
+        'Fixez un plafond pour le mois entier et suivez tout ce que vous dépensez, '
+            'même hors des catégories que vous surveillez.',
+        'Set a cap for the whole month and track everything you spend, even '
+            'outside the categories you watch.',
+      );
+  String get budgetSetOverall =>
+      _s('Définir le budget du mois', 'Set the monthly budget');
+  String get budgetEditOverall =>
+      _s('Modifier le budget du mois', 'Edit the monthly budget');
+
+  // Category coverage — deliberately NOT called "the month's budget".
+  String get budgetCoverageTitle =>
+      _s('Total des budgets par catégorie', 'Total of category budgets');
+  String get budgetCoverageHint => _s(
+        'Somme de vos plafonds par catégorie — ce n’est pas le budget du mois.',
+        'The sum of your category caps — not the month’s budget.',
+      );
+  String budgetUnwatched(String amount) => _s(
+        '$amount dépensés hors budget catégorie',
+        '$amount spent outside any category budget',
+      );
+
+  // Pacing
+  String get budgetPaceLabel => _s('Rythme', 'Pace');
+  String budgetPaceExpected(int percent) =>
+      _s('Rythme régulier : $percent%', 'Even pace: $percent%');
+  String get budgetAheadOfPace =>
+      _s('Vous dépensez plus vite que prévu', 'You are spending faster than planned');
+  String get budgetOnPace => _s('Dans les temps', 'On pace');
+  String budgetDaysLeft(int n) =>
+      _s('$n jour${n > 1 ? 's' : ''} restant${n > 1 ? 's' : ''}', '$n day${n > 1 ? 's' : ''} left');
+  String budgetSafeDaily(String amount) =>
+      _s('$amount / jour possible', '$amount / day available');
+  String get budgetMonthClosed => _s('Mois clôturé', 'Month closed');
+
+  // Repetition
+  String get budgetAppliesTo => _s('S’applique à', 'Applies to');
+  String get budgetKindOverall => _s('Tout le mois', 'The whole month');
+  String get budgetKindCategory => _s('Une catégorie', 'One category');
+  String get budgetRepeat => _s('Répéter sur', 'Repeat for');
+  String budgetRepeatMonths(int n) =>
+      _s('$n mois', '$n month${n > 1 ? 's' : ''}');
+  String get budgetRepeatOnce => _s('Ce mois seulement', 'This month only');
+  String get budgetRepeatHint => _s(
+        'Chaque mois reçoit son propre budget, indépendant : modifier ou dépasser '
+            'un mois ne change jamais l’historique des autres.',
+        'Each month gets its own independent budget: editing or overspending one '
+            'month never changes what the others recorded.',
+      );
+  String get budgetRepeatingBadge => _s('Récurrent', 'Repeating');
+  String get budgetDeleteSeries =>
+      _s('Supprimer aussi les mois suivants', 'Also delete the following months');
+  String get budgetDeleteThisMonth =>
+      _s('Ce mois seulement', 'This month only');
+  String budgetAppliedTo(int n) => _s(
+        'Budget appliqué sur $n mois',
+        'Budget applied to $n month${n > 1 ? 's' : ''}',
+      );
+
   // ---------------------------------------------------- AI
   String get aiAssistant => _s('Assistant', 'Assistant');
   String get aiForecast => _s('Prévisions', 'Forecast');

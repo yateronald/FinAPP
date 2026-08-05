@@ -62,6 +62,7 @@ class NotificationsRepository {
   Future<void> markAllRead() async => _api.patch('/notifications/read-all');
   Future<void> markRead(String id) async => _api.patch('/notifications/$id/read');
   Future<void> remove(String id) async => _api.delete('/notifications/$id');
+
   Future<void> removeAll() async => _api.delete('/notifications/all');
 }
 
@@ -542,24 +543,32 @@ class _Tile extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             onTap: unread ? () => onRead() : null,
             child: Container(
+              // The unread spine is a LEFT BORDER, not a stretched child: a
+              // Row with CrossAxisAlignment.stretch inside a ListView gets an
+              // unbounded height constraint, which silently paints nothing in
+              // release builds.
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: unread ? color.withValues(alpha: 0.30) : context.borderColor,
+                border: Border(
+                  left: BorderSide(
+                    color: unread ? color : context.borderColor,
+                    width: unread ? 4 : 1,
+                  ),
+                  top: BorderSide(
+                      color: unread
+                          ? color.withValues(alpha: 0.30)
+                          : context.borderColor),
+                  right: BorderSide(
+                      color: unread
+                          ? color.withValues(alpha: 0.30)
+                          : context.borderColor),
+                  bottom: BorderSide(
+                      color: unread
+                          ? color.withValues(alpha: 0.30)
+                          : context.borderColor),
                 ),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Unread items carry a coloured spine, as in the design.
-                    Container(
-                      width: 4,
-                      color: unread ? color : Colors.transparent,
-                    ),
-                    Expanded(
-                      child: Padding(
+              child: Padding(
                         padding: const EdgeInsets.fromLTRB(12, 13, 8, 13),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -655,10 +664,6 @@ class _Tile extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
         ),

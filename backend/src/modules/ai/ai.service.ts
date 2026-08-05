@@ -57,12 +57,14 @@ export class AiService {
       aiProvider as AiProvider,
       aiProvider === 'GEMINI' ? settings?.geminiModel : settings?.agentRouterModel,
     );
-    const [summary, distribution, last6Months, budgetStatuses] = await Promise.all([
-      this.dashboard.getSummary(userId, month, year),
-      this.dashboard.getExpenseDistribution(userId, month, year),
-      this.dashboard.getIncomeVsExpenses(userId, 6, month, year),
-      this.budgetEngine.getStatuses(userId, month, year),
-    ]);
+    const [summary, distribution, last6Months, budgetStatuses, overallBudget] =
+      await Promise.all([
+        this.dashboard.getSummary(userId, month, year),
+        this.dashboard.getExpenseDistribution(userId, month, year),
+        this.dashboard.getIncomeVsExpenses(userId, 6, month, year),
+        this.budgetEngine.getStatuses(userId, month, year),
+        this.budgetEngine.overallStatus(userId, month, year),
+      ]);
 
     return {
       currency,
@@ -80,6 +82,21 @@ export class AiService {
         progress: b.progress,
         status: b.status,
       })),
+      // The month-wide cap. Separate from the sum of category caps, and the
+      // only figure that accounts for spending outside every budgeted category.
+      overallBudget: overallBudget
+        ? {
+            budget: overallBudget.budget,
+            spent: overallBudget.spent,
+            remaining: overallBudget.remaining,
+            progress: overallBudget.progress,
+            status: overallBudget.status,
+            expectedProgress: overallBudget.expectedProgress,
+            daysLeft: overallBudget.daysLeft,
+            safeDailySpend: overallBudget.safeDailySpend,
+            unbudgetedSpend: overallBudget.uncategorisedSpend,
+          }
+        : null,
     };
   }
 
@@ -94,6 +111,15 @@ Financial score: ${ctx.summary.financialScore}/100
 Top expense categories: ${ctx.topExpenseCategories
       .map((c: any) => `${c.name}=${c.amount} (${c.percentage}%)`)
       .join(', ')}
+Overall month budget: ${
+      ctx.overallBudget
+        ? `${ctx.overallBudget.spent}/${ctx.overallBudget.budget} (${ctx.overallBudget.progress}%, ${ctx.overallBudget.status}), ` +
+          `even pace would be ${ctx.overallBudget.expectedProgress}%, ` +
+          `${ctx.overallBudget.daysLeft} day(s) left, ` +
+          `safe daily spend ${Math.round(ctx.overallBudget.safeDailySpend ?? 0)}, ` +
+          `spending outside budgeted categories ${ctx.overallBudget.unbudgetedSpend}`
+        : 'none set'
+    }
 Budgets: ${
       ctx.budgets.length
         ? ctx.budgets
@@ -131,8 +157,17 @@ Budgets: ${
     const period = { gte: start, lt: end };
 
     if (scope === 'BUDGET') {
-      const budgets = await this.prisma.monthlyBudget.count({ where: { userId, month, year } });
-      return budgets > 0;
+      // An overall month cap alone is enough to analyse — a user may run one
+      // without setting a single category budget.
+      const [budgets, overall] = await Promise.all([
+        this.prisma.monthlyBudget.count({
+          where: { userId, month, year, deletedAt: null },
+        }),
+        this.prisma.overallBudget.count({
+          where: { userId, month, year, deletedAt: null },
+        }),
+      ]);
+      return budgets + overall > 0;
     }
     if (scope === 'INCOME') {
       const incomes = await this.prisma.income.count({
@@ -275,14 +310,26 @@ Budgets: ${
     return insights;
   }
 
+  /** One line describing the month-wide cap, or nothing when none is set. */
+  private overallBudgetLine(ctx: any): string {
+    const o = ctx.overallBudget;
+    if (!o) return '';
+    return (
+      `Overall month budget: spent ${o.spent}/${o.budget} (${o.progress}%, status: ${o.status}), ` +
+      `even pace would be ${o.expectedProgress}% by now, ${o.daysLeft} day(s) remain, ` +
+      `safe daily spend ${Math.round(o.safeDailySpend ?? 0)}, ` +
+      `${o.unbudgetedSpend} spent outside any budgeted category.\n`
+    );
+  }
+
   private buildScopedPrompt(ctx: any, scope: InsightScope): string {
     let scopeInstruction: string;
     let dataContext: string;
     switch (scope) {
       case 'BUDGET':
         scopeInstruction =
-          'CRITICAL SCOPE RULE: Focus STRICTLY and ONLY on BUDGET OBJECTIVES and spending caps. Evaluate category budgets, overruns, remaining balances, and budget optimization. Do NOT comment on general income or overall savings.';
-        dataContext = `Budgets: ${
+          'CRITICAL SCOPE RULE: Focus STRICTLY and ONLY on BUDGET OBJECTIVES and spending caps. Evaluate the overall month cap AND the category budgets: overruns, remaining balances, pace against the even-spend line, spending that no category budget covers, and budget optimization. Do NOT comment on general income or overall savings.';
+        dataContext = `${this.overallBudgetLine(ctx)}Budgets: ${
           ctx.budgets.length
             ? ctx.budgets
                 .map(

@@ -202,6 +202,9 @@ export class ExpensesService {
 
     // Fire-and-forget side effects (budget alerts + large expense alert).
     void this.budgetEngine.evaluateAndNotify(userId, dto.categoryId, date);
+    // The month cap is independent: every category can be inside its own
+    // budget while the month as a whole runs over.
+    void this.budgetEngine.evaluateOverallAndNotify(userId, date);
     void this.checkLargeExpense(userId, dto.amount, dto.title);
 
     return expense;
@@ -300,6 +303,7 @@ export class ExpensesService {
     });
     await this.audit.log({ userId, action: 'EXPENSE_UPDATED', entity: 'Expense', entityId: id });
     void this.budgetEngine.evaluateAndNotify(userId, expense.categoryId, expense.date);
+    void this.budgetEngine.evaluateOverallAndNotify(userId, expense.date);
     return expense;
   }
 

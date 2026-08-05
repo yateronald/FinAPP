@@ -40,8 +40,11 @@ export class AiChatService {
     ),
     my_expenses AS (
       SELECT e.id, e.title, e.amount, e.date, e.description, e.payment_method, e.tags,
-             c.name AS category, c.type AS category_type
-      FROM expenses e JOIN categories c ON c.id = e.category_id
+             c.name AS category, c.type AS category_type,
+             l.name AS loan
+      FROM expenses e
+      JOIN categories c ON c.id = e.category_id
+      LEFT JOIN loans l ON l.id = e.loan_id
       WHERE e.user_id = $1 AND e.deleted_at IS NULL
     ),
     my_categories AS (
@@ -49,9 +52,79 @@ export class AiChatService {
       FROM categories WHERE user_id = $1 AND deleted_at IS NULL
     ),
     my_budgets AS (
-      SELECT b.id, b.amount, b.month, b.year, c.name AS category
+      SELECT b.id, b.amount, b.month, b.year, c.name AS category,
+             (b.series_id IS NOT NULL) AS is_recurring
       FROM monthly_budgets b JOIN categories c ON c.id = b.category_id
       WHERE b.user_id = $1 AND b.deleted_at IS NULL
+    ),
+    my_overall_budgets AS (
+      SELECT ob.id, ob.amount, ob.month, ob.year,
+             (ob.series_id IS NOT NULL) AS is_recurring
+      FROM overall_budgets ob
+      WHERE ob.user_id = $1 AND ob.deleted_at IS NULL
+    ),
+    my_loans AS (
+      SELECT l.id, l.name, l.lender, l.description,
+             l.principal_amount, l.initial_paid_amount,
+             l.start_date, l.expected_end_date, l.status
+      FROM loans l
+      WHERE l.user_id = $1 AND l.deleted_at IS NULL
+    ),
+    /* Spend per month, all categories together: what the overall cap is
+       measured against. */
+    my_monthly_spend AS (
+      SELECT EXTRACT(YEAR FROM e.date)::int AS year,
+             EXTRACT(MONTH FROM e.date)::int AS month,
+             SUM(e.amount) AS spent,
+             COUNT(*)::int AS expense_count
+      FROM expenses e
+      WHERE e.user_id = $1 AND e.deleted_at IS NULL
+      GROUP BY 1, 2
+    ),
+    my_category_month_spend AS (
+      SELECT c.name AS category,
+             EXTRACT(YEAR FROM e.date)::int AS year,
+             EXTRACT(MONTH FROM e.date)::int AS month,
+             SUM(e.amount) AS spent
+      FROM expenses e JOIN categories c ON c.id = e.category_id
+      WHERE e.user_id = $1 AND e.deleted_at IS NULL
+      GROUP BY 1, 2, 3
+    ),
+    /* Ready-made budget usage, so the model never has to re-derive the
+       month join (the step it most often gets wrong). */
+    my_overall_budget_status AS (
+      SELECT ob.id, ob.month, ob.year, ob.is_recurring,
+             ob.amount AS budget,
+             COALESCE(ms.spent, 0) AS spent,
+             ob.amount - COALESCE(ms.spent, 0) AS remaining,
+             CASE WHEN ob.amount > 0
+                  THEN ROUND(COALESCE(ms.spent, 0) / ob.amount * 100, 1)
+                  ELSE 0 END AS progress,
+             CASE WHEN ob.amount <= 0 THEN 'ok'
+                  WHEN COALESCE(ms.spent, 0) >= ob.amount THEN 'exceeded'
+                  WHEN COALESCE(ms.spent, 0) >= ob.amount * 0.9 THEN 'danger'
+                  WHEN COALESCE(ms.spent, 0) >= ob.amount * 0.8 THEN 'warning'
+                  ELSE 'ok' END AS status
+      FROM my_overall_budgets ob
+      LEFT JOIN my_monthly_spend ms
+        ON ms.month = ob.month AND ms.year = ob.year
+    ),
+    my_budget_status AS (
+      SELECT b.id, b.category, b.month, b.year, b.is_recurring,
+             b.amount AS budget,
+             COALESCE(s.spent, 0) AS spent,
+             b.amount - COALESCE(s.spent, 0) AS remaining,
+             CASE WHEN b.amount > 0
+                  THEN ROUND(COALESCE(s.spent, 0) / b.amount * 100, 1)
+                  ELSE 0 END AS progress,
+             CASE WHEN b.amount <= 0 THEN 'ok'
+                  WHEN COALESCE(s.spent, 0) >= b.amount THEN 'exceeded'
+                  WHEN COALESCE(s.spent, 0) >= b.amount * 0.9 THEN 'danger'
+                  WHEN COALESCE(s.spent, 0) >= b.amount * 0.8 THEN 'warning'
+                  ELSE 'ok' END AS status
+      FROM my_budgets b
+      LEFT JOIN my_category_month_spend s
+        ON s.category = b.category AND s.month = b.month AND s.year = b.year
     )`;
 
   private readonly allowedTables = new Set([
@@ -59,6 +132,12 @@ export class AiChatService {
     'my_expenses',
     'my_categories',
     'my_budgets',
+    'my_overall_budgets',
+    'my_loans',
+    'my_monthly_spend',
+    'my_category_month_spend',
+    'my_overall_budget_status',
+    'my_budget_status',
   ]);
 
   // ------------------------------------------------------------- Tool schema
@@ -71,12 +150,23 @@ export class AiChatService {
           'You compose the query yourself. You may ONLY reference these already-user-scoped tables ' +
           '(never any other table): ' +
           'my_income(id, title, amount, date, description, is_recurring, category, category_type), ' +
-          'my_expenses(id, title, amount, date, description, payment_method, tags text[], category, category_type), ' +
+          'my_expenses(id, title, amount, date, description, payment_method, tags text[], category, category_type, loan), ' +
           'my_categories(id, name, type, icon, color, is_archived), ' +
-          'my_budgets(id, amount, month, year, category). ' +
+          'my_loans(id, name, lender, description, principal_amount, initial_paid_amount, start_date, expected_end_date, status), ' +
+          'my_monthly_spend(year, month, spent, expense_count), ' +
+          'my_category_month_spend(category, year, month, spent), ' +
+          'my_budgets(id, amount, month, year, category, is_recurring), ' +
+          'my_overall_budgets(id, amount, month, year, is_recurring), ' +
+          'my_budget_status(id, category, month, year, is_recurring, budget, spent, remaining, progress, status), ' +
+          'my_overall_budget_status(id, month, year, is_recurring, budget, spent, remaining, progress, status). ' +
+          'BUDGETS — there are TWO independent layers, never mix them up: ' +
+          '(a) the OVERALL budget is one cap for the WHOLE month, and every expense of that month counts against it — use my_overall_budget_status; ' +
+          '(b) CATEGORY budgets are caps per category — use my_budget_status. ' +
+          'The sum of category budgets is NOT the overall budget: a user can be inside every category cap and still exceed the month. ' +
+          'Both status tables already carry budget, spent, remaining, progress (%) and status (ok|warning|danger|exceeded), so prefer them over recomputing joins. ' +
+          'is_recurring means the budget was created as part of a repeating run; each month is still its own independent row, so past months keep their own amounts. ' +
           'Rules: a single read-only query — a SELECT, optionally starting with your own WITH CTEs; no INSERT/UPDATE/DELETE/DDL; no comments; no recursive CTEs. ' +
           'Use EXTRACT(MONTH FROM date) / EXTRACT(YEAR FROM date) for period filters. ' +
-          'To compute budget usage, LEFT JOIN my_budgets to my_expenses on category and matching month/year. ' +
           'The data is already limited to the current user — do NOT add user filters.',
         parameters: {
           type: 'object',
@@ -108,7 +198,7 @@ export class AiChatService {
       return { ok: false, error: 'system schema access is denied' };
 
     const sensitive =
-      /\b(users|user_settings|refresh_tokens|otp_codes|audit_logs|income|expenses|categories|monthly_budgets|recurring_transactions|password|password_hash|token_hash|code_hash|google_id|secret|credential|email)\b/i;
+      /\b(users|user_settings|refresh_tokens|otp_codes|audit_logs|income|expenses|categories|monthly_budgets|overall_budgets|loans|recurring_transactions|password|password_hash|token_hash|code_hash|google_id|secret|credential|email)\b/i;
     if (sensitive.test(s)) return { ok: false, error: 'that table or column is not accessible' };
 
     // CTE names the query defines itself (WITH name AS (...)) are also valid
@@ -173,10 +263,23 @@ export class AiChatService {
       'id', 'title', 'amount', 'date', 'description', 'is_recurring', 'category', 'category_type',
     ]),
     my_expenses: new Set([
-      'id', 'title', 'amount', 'date', 'description', 'payment_method', 'tags', 'category', 'category_type',
+      'id', 'title', 'amount', 'date', 'description', 'payment_method', 'tags', 'category', 'category_type', 'loan',
     ]),
     my_categories: new Set(['id', 'name', 'type', 'icon', 'color', 'is_archived']),
-    my_budgets: new Set(['id', 'amount', 'month', 'year', 'category']),
+    my_budgets: new Set(['id', 'amount', 'month', 'year', 'category', 'is_recurring']),
+    my_overall_budgets: new Set(['id', 'amount', 'month', 'year', 'is_recurring']),
+    my_budget_status: new Set([
+      'id', 'category', 'month', 'year', 'is_recurring', 'budget', 'spent', 'remaining', 'progress', 'status',
+    ]),
+    my_overall_budget_status: new Set([
+      'id', 'month', 'year', 'is_recurring', 'budget', 'spent', 'remaining', 'progress', 'status',
+    ]),
+    my_monthly_spend: new Set(['year', 'month', 'spent', 'expense_count']),
+    my_category_month_spend: new Set(['category', 'year', 'month', 'spent']),
+    my_loans: new Set([
+      'id', 'name', 'lender', 'description', 'principal_amount', 'initial_paid_amount',
+      'start_date', 'expected_end_date', 'status',
+    ]),
   };
 
   /** date_part keyword → PostgreSQL expression over a date column. */
@@ -364,8 +467,17 @@ export class AiChatService {
           'Tables (already limited to this user): ' +
           'my_expenses(amount, date, title, description, payment_method, category, category_type), ' +
           'my_income(amount, date, title, description, is_recurring, category, category_type), ' +
-          'my_budgets(amount, month, year, category), ' +
+          'my_budgets(amount, month, year, category, is_recurring), ' +
+          'my_overall_budgets(amount, month, year, is_recurring), ' +
+          'my_budget_status(category, month, year, budget, spent, remaining, progress, status, is_recurring), ' +
+          'my_overall_budget_status(month, year, budget, spent, remaining, progress, status, is_recurring), ' +
+          'my_monthly_spend(year, month, spent, expense_count), ' +
+          'my_category_month_spend(category, year, month, spent), ' +
+          'my_loans(name, lender, description, principal_amount, initial_paid_amount, start_date, expected_end_date, status), ' +
           'my_categories(name, type, icon, color, is_archived). ' +
+          'BUDGETS come in TWO independent layers: my_overall_budget_status is ONE cap for the WHOLE month that every expense counts against, ' +
+          'while my_budget_status holds the per-category caps. The sum of category caps is NOT the overall budget. ' +
+          'Both already carry budget, spent, remaining, progress and status (ok|warning|danger|exceeded) — read them directly rather than recomputing. ' +
           'Shape: {"source":"my_expenses","fields":[{"field":"category"},{"agg":"sum","field":"amount","as":"total"},{"agg":"count","as":"n"}],' +
           '"filters":[{"field":"category","op":"=","value":"Food"},{"datePart":"month","op":"=","value":7}],' +
           '"groupBy":[{"field":"category"}],"sort":[{"ref":"total","dir":"desc"}],"limit":20}. ' +
@@ -379,7 +491,9 @@ export class AiChatService {
           properties: {
             source: {
               type: 'string',
-              enum: ['my_expenses', 'my_income', 'my_budgets', 'my_categories'],
+              enum: ['my_expenses', 'my_income', 'my_budgets', 'my_categories',
+                'my_overall_budgets', 'my_budget_status', 'my_overall_budget_status',
+                'my_monthly_spend', 'my_category_month_spend', 'my_loans'],
               description: 'Which table to read from.',
             },
             fields: { type: 'array', items: { type: 'object' }, description: 'Dimensions / aggregates / date parts to return.' },

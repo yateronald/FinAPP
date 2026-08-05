@@ -124,6 +124,7 @@ model User {
   incomes           Income[]
   expenses          Expense[]
   budgets           MonthlyBudget[]
+  overallBudgets    OverallBudget[]
   aiInsights        AiInsight[]
   notifications     Notification[]
   recurring         RecurringTransaction[]
@@ -339,6 +340,12 @@ model Loan {
 // Monthly Budget Objectives
 // --------------------------------------------------------------------------
 
+/// A spending cap for ONE category in ONE month.
+///
+/// Each month is a separate row on purpose: a budget that repeats is
+/// materialised month by month, so editing or overspending in August can never
+/// rewrite what July's history says. [seriesId] only groups the rows that were
+/// created together, for "delete the rest of the run".
 model MonthlyBudget {
   id          String    @id @default(uuid())
   userId      String    @map("user_id")
@@ -347,6 +354,7 @@ model MonthlyBudget {
   month       Int       // 1-12
   year        Int
   rollover    Boolean   @default(false)
+  seriesId    String?   @map("series_id")
 
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -357,7 +365,30 @@ model MonthlyBudget {
 
   @@unique([userId, categoryId, month, year])
   @@index([userId, year, month])
+  @@index([seriesId])
   @@map("monthly_budgets")
+}
+
+/// The overall cap for a month: every expense counts against it, whatever its
+/// category. Independent of [MonthlyBudget] — a user can run either, or both.
+model OverallBudget {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  amount      Decimal   @db.Decimal(14, 2)
+  month       Int       // 1-12
+  year        Int
+  seriesId    String?   @map("series_id")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month, year])
+  @@index([userId, year, month])
+  @@index([seriesId])
+  @@map("overall_budgets")
 }
 
 // --------------------------------------------------------------------------
