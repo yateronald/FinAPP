@@ -54,6 +54,11 @@ class AppText {
   String get loanLender => _s('Prêteur (optionnel)', 'Lender (optional)');
   String get loanLenderHint => _s('Ex. Ecobank, un proche…', 'e.g. Ecobank, a relative…');
   String get loanDescription => _s('Description (optionnel)', 'Description (optional)');
+  String get loanDescriptionHint =>
+      _s('Ex. Raison du prêt, notes…', 'e.g. Reason, notes…');
+  String get loanCreateAction => _s('Créer le prêt', 'Create loan');
+  String get loanSaveAction =>
+      _s('Enregistrer le prêt', 'Save loan');
   String get loanPrincipal => _s('Montant total emprunté', 'Total amount borrowed');
   String get loanAlreadyPaid => _s('Déjà remboursé', 'Already repaid');
   String get loanAlreadyPaidHelp => _s(
@@ -108,8 +113,21 @@ class AppText {
       _s('Je rembourse un prêt', 'This repays a loan');
   String get expenseChooseLoan => _s('Choisir le prêt', 'Choose the loan');
   String get expenseNoLoanYet => _s(
-        'Vous n’avez aucun prêt enregistré. Créez-en un pour lier ce paiement.',
-        'You have no loans yet. Create one to link this payment.',
+        'Vous n’avez aucun prêt enregistré. Créez-en un pour lier ce paiement, '
+            'ou décochez la case pour enregistrer une dépense simple.',
+        'You have no loans yet. Create one to link this payment, or untick the '
+            'box to record a plain expense.',
+      );
+  String get expenseUntickLoan => _s('Décocher', 'Untick');
+  String get expenseLoanToggleHint => _s(
+        'Activez pour imputer cette dépense à un prêt',
+        'Turn on to count this expense towards a loan',
+      );
+  String get expenseLoanRequired => _s(
+        'Sélectionnez le prêt remboursé, ou décochez « Je rembourse un prêt » '
+            'pour enregistrer une dépense simple.',
+        'Select the loan being repaid, or untick “This repays a loan” to record '
+            'a plain expense.',
       );
 
   // ---------------------------------------------------- Onboarding
@@ -404,6 +422,30 @@ class AppText {
   // ---------------------------------------------------- Notifications
   String get markAllRead => _s('Tout lire', 'Mark all read');
   String get noNotifications => _s('Aucune notification', 'No notifications');
+  String get noNotificationsBody => _s(
+        'Vos alertes de budget, bilans et conseils IA apparaîtront ici.',
+        'Your budget alerts, summaries and AI tips will show up here.',
+      );
+  String get notifDeleteAll => _s('Tout supprimer', 'Delete all');
+  String get notifDeleteAllTitle =>
+      _s('Supprimer toutes les notifications ?', 'Delete all notifications?');
+  String notifDeleteAllBody(int n) => _s(
+        '$n notification${n > 1 ? 's' : ''} seront définitivement supprimées. '
+            'Cette action est irréversible.',
+        '$n notification${n > 1 ? 's' : ''} will be permanently deleted. '
+            'This cannot be undone.',
+      );
+  String get notifDeleted => _s('Notification supprimée', 'Notification deleted');
+  String get notifAllDeleted =>
+      _s('Notifications supprimées', 'Notifications deleted');
+  String get notifFilterAll => _s('Toutes', 'All');
+  String get notifFilterAlerts => _s('Alertes', 'Alerts');
+  String get notifFilterTips => _s('Conseils', 'Tips');
+  String get notifFilterInfo => _s('Infos', 'Info');
+  String get notifNoneInFilter =>
+      _s('Rien dans cette catégorie', 'Nothing in this category');
+  String get notifUnreadOne => _s('non lue', 'unread');
+  String get notifUnreadMany => _s('non lues', 'unread');
 
   // ---------------------------------------------------- Reports
   String get reportWeek => _s('Semaine', 'Week');
@@ -449,6 +491,13 @@ class AppText {
   String get date => _s('Date', 'Date');
   String get saveFailed => _s('Impossible d\'enregistrer', 'Could not save');
   String get addAction => _s('Ajouter', 'Add');
+  String get addExpenseAction => _s('Ajouter la dépense', 'Add expense');
+  String get addIncomeAction => _s('Ajouter le revenu', 'Add income');
+  String get saveExpenseAction =>
+      _s('Enregistrer la dépense', 'Save expense');
+  String get saveIncomeAction => _s('Enregistrer le revenu', 'Save income');
+  String get noteHint =>
+      _s('Ex. Détails, rappel…', 'e.g. Details, reminder…');
   String get newObjective => _s('Nouvel objectif', 'New goal');
   String get objectiveSub => _s('Épargne, projet, achat…', 'Savings, project, purchase…');
   String get incomeSub => _s('Salaire, freelance, cadeau…', 'Salary, freelance, gift…');

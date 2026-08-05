@@ -24,6 +24,9 @@ class Transaction {
   final String? categoryIcon;
   final Color categoryColor;
 
+  /// Set when this expense repays a loan. Always null for income.
+  final String? loanId;
+
   Transaction({
     required this.id,
     required this.type,
@@ -35,6 +38,7 @@ class Transaction {
     required this.categoryName,
     required this.categoryIcon,
     required this.categoryColor,
+    this.loanId,
   });
 
   factory Transaction.fromJson(Map<String, dynamic> j, TxType type) {
@@ -53,6 +57,7 @@ class Transaction {
         cat['color'],
         type == TxType.income ? AppColors.success : AppColors.danger,
       ),
+      loanId: type == TxType.income ? null : j['loanId'] as String?,
     );
   }
 }

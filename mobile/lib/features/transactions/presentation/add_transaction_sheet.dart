@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/category_icons.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/form_kit.dart';
 import '../../categories/data/category_model.dart';
 import '../../categories/presentation/categories_screen.dart' show showCategorySheet;
 import '../../categories/providers/categories_provider.dart';
@@ -58,6 +59,16 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
   bool _isLoanPayment = false;
   String? _loanId;
 
+  /// Raised on a save attempt so the loan picker can flag itself. Ticking the
+  /// box without choosing a loan is an incomplete answer, not a plain expense.
+  bool _loanTouched = false;
+
+  /// Same idea for the category, which lives outside the Form validators.
+  bool _categoryTouched = false;
+
+  bool get _loanSelectionMissing =>
+      !widget.type.isIncome && _isLoanPayment && _loanId == null;
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +78,9 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
     _note = TextEditingController(text: e?.description ?? '');
     _date = e?.date ?? DateTime.now();
     _categoryId = e?.categoryId;
+    // Restore an existing loan link, otherwise re-saving would silently drop it.
+    _loanId = e?.loanId;
+    _isLoanPayment = _loanId != null;
   }
 
   @override
@@ -90,7 +104,17 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_categoryId == null) {
-      setState(() => _error = context.t.chooseCategory);
+      setState(() {
+        _categoryTouched = true;
+        _error = context.t.chooseCategory;
+      });
+      return;
+    }
+    if (_loanSelectionMissing) {
+      setState(() {
+        _loanTouched = true;
+        _error = context.t.expenseLoanRequired;
+      });
       return;
     }
     setState(() {
@@ -103,8 +127,14 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
       amount: double.parse(_amount.text.replaceAll(RegExp(r'[^0-9.]'), '')),
       date: _date,
       description: _note.text.trim(),
-      // '' clears an existing link when the box is unticked while editing.
-      loanId: widget.type.isIncome ? null : (_isLoanPayment ? _loanId : ''),
+      // Guarded above: ticked always means a loan is selected by now.
+      // '' clears an existing link when the box is unticked while editing;
+      // on create there is nothing to clear, so the field is simply omitted.
+      loanId: widget.type.isIncome
+          ? null
+          : _isLoanPayment
+              ? _loanId
+              : (_isEdit ? '' : null),
     );
     try {
       final repo = ref.read(transactionRepositoryProvider);
@@ -135,311 +165,176 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
     }
   }
 
+  /// Top-bar pill: the three answers that make a transaction complete.
+  double get _completion {
+    final done = [
+      double.tryParse(_amount.text.replaceAll(RegExp(r'[^0-9.]'), '')) != null &&
+          (double.tryParse(_amount.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0) > 0,
+      _title.text.trim().isNotEmpty,
+      _categoryId != null,
+    ].where((e) => e).length;
+    return done / 3;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final t = context.t;
+    final isIncome = widget.type.isIncome;
     final categories = ref.watch(categoriesByTypeProvider(_catType));
-    final accent = widget.type.isIncome ? AppColors.success : AppColors.danger;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final accent = isIncome ? AppColors.successDark : AppColors.danger;
+    final selectedCategory =
+        categories.where((c) => c.id == _categoryId).firstOrNull;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, 12, 20, 24 + MediaQuery.of(context).padding.bottom),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.borderColor,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Header: coloured badge + title.
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: accent,
-                        borderRadius: BorderRadius.circular(13),
-                        boxShadow: [
-                          BoxShadow(
-                            color: accent.withValues(alpha: 0.35),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        widget.type.isIncome
-                            ? Icons.arrow_upward_rounded
-                            : Icons.arrow_downward_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        widget.type.isIncome
-                            ? (_isEdit ? context.t.editIncome() : context.t.newIncome())
-                            : (_isEdit ? context.t.editExpense() : context.t.newExpense()),
-                        style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () => Navigator.pop(context),
-                      customBorder: const CircleBorder(),
-                      child: Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration:
-                            BoxDecoration(color: context.surfaceAlt, shape: BoxShape.circle),
-                        child: Icon(Icons.close_rounded, size: 18, color: context.muted),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                // Amount — highlighted hero field tinted with the type colour.
-                Container(
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.07),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: accent.withValues(alpha: 0.22)),
-                  ),
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(context.t.amount,
-                          style: TextStyle(
-                              color: context.muted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
-                      TextFormField(
-                        controller: _amount,
-                        keyboardType:
-                            const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))
-                        ],
-                        style: TextStyle(
-                            fontSize: 30, fontWeight: FontWeight.w800, color: accent),
-                        decoration: InputDecoration(
-                          hintText: '0',
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          errorBorder: InputBorder.none,
-                          focusedErrorBorder: InputBorder.none,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Text(widget.type.isIncome ? '+' : '−',
-                                style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w800,
-                                    color: accent)),
-                          ),
-                          prefixIconConstraints: const BoxConstraints(minWidth: 0),
-                          suffixText: 'FCFA',
-                          suffixStyle: TextStyle(
-                              color: context.muted,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700),
-                        ),
-                        validator: (v) {
-                          final n =
-                              double.tryParse((v ?? '').replaceAll(RegExp(r'[^0-9.]'), ''));
-                          if (n == null || n <= 0) return context.t.invalidAmount;
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _title,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                      labelText: context.t.title, hintText: context.t.titleHint),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? context.t.required : null,
-                ),
-                const SizedBox(height: 16),
-                Text(context.t.category, style: TextStyle(color: context.muted, fontSize: 13)),
-                const SizedBox(height: 8),
-                _CategoryPicker(
-                  categories: categories,
-                  selectedId: _categoryId,
-                  onSelect: (id) => setState(() => _categoryId = id),
-                  type: _catType,
-                ),
-                const SizedBox(height: 16),
-                InkWell(
-                  onTap: _pickDate,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    decoration: BoxDecoration(
-                      color: context.surfaceAlt,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_today_rounded, size: 20, color: context.muted),
-                        const SizedBox(width: 12),
-                        Text(Dates.short(_date), style: const TextStyle(fontWeight: FontWeight.w600)),
-                        const Spacer(),
-                        Icon(Icons.expand_more_rounded, color: context.muted),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _note,
-                  maxLines: 2,
-                  decoration: InputDecoration(labelText: context.t.noteOptional),
-                ),
-                // Expenses only — repaying a loan is never income.
-                if (!widget.type.isIncome) ...[
-                  const SizedBox(height: 16),
-                  LoanPaymentField(
-                    checked: _isLoanPayment,
-                    selectedLoanId: _loanId,
-                    onCheckedChanged: (v) => setState(() {
-                      _isLoanPayment = v;
-                      if (!v) _loanId = null;
-                    }),
-                    onLoanSelected: (id) => setState(() => _loanId = id),
-                  ),
-                ],
-                if (_error != null) ...[
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                          child: Text(_error!, style: const TextStyle(color: AppColors.danger))),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _saving ? null : _submit,
-                    child: _saving
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                          )
-                        : Text(_isEdit ? context.t.save : context.t.addAction),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    return FormSheetShell(
+      accent: accent,
+      icon: isIncome ? Icons.savings_rounded : Icons.shopping_bag_rounded,
+      title: isIncome
+          ? (_isEdit ? t.editIncome() : t.newIncome())
+          : (_isEdit ? t.editExpense() : t.newExpense()),
+      formKey: _formKey,
+      progress: _completion,
+      footer: FormPrimaryButton(
+        accent: accent,
+        label: _isEdit
+            ? (isIncome ? t.saveIncomeAction : t.saveExpenseAction)
+            : (isIncome ? t.addIncomeAction : t.addExpenseAction),
+        loading: _saving,
+        onPressed: _saving ? null : _submit,
       ),
+      children: [
+        // The amount is the reason the sheet is open, so it gets the loudest
+        // type: same card, oversized accent-coloured value.
+        FormTextCard(
+          icon: isIncome
+              ? Icons.arrow_upward_rounded
+              : Icons.arrow_downward_rounded,
+          accent: accent,
+          label: t.amount,
+          hint: '0',
+          controller: _amount,
+          required: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+          suffix: 'FCFA',
+          textStyle: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            color: accent,
+            height: 1.25,
+          ),
+          onChanged: (_) => setState(() {}),
+          validator: (v) {
+            final n = double.tryParse((v ?? '').replaceAll(RegExp(r'[^0-9.]'), ''));
+            if (n == null || n <= 0) return t.invalidAmount;
+            return null;
+          },
+        ),
+        FormTextCard(
+          icon: Icons.edit_note_rounded,
+          accent: accent,
+          label: t.title,
+          hint: t.titleHint,
+          controller: _title,
+          required: true,
+          onChanged: (_) => setState(() {}),
+          validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
+        ),
+        if (categories.isEmpty)
+          FormInfoBanner(
+            accent: accent,
+            icon: Icons.category_rounded,
+            text: Text(t.noCategory,
+                style: TextStyle(fontSize: 12.5, height: 1.4, color: context.muted)),
+          )
+        else
+          FormPickerCard(
+            icon: Icons.category_rounded,
+            accent: accent,
+            label: t.category,
+            required: true,
+            value: selectedCategory?.name ?? t.selectCategory,
+            placeholder: selectedCategory == null,
+            errorText: _categoryTouched && _categoryId == null ? t.chooseCategory : null,
+            leading: selectedCategory == null
+                ? null
+                : _CategoryDot(category: selectedCategory),
+            onTap: () async {
+              FocusScope.of(context).unfocus();
+              final id = await showCategoryPickerSheet(
+                context,
+                categories: categories,
+                selectedId: _categoryId,
+                type: _catType,
+              );
+              if (id != null) {
+                setState(() {
+                  _categoryId = id;
+                  _categoryTouched = false;
+                  if (_error == t.chooseCategory) _error = null;
+                });
+              }
+            },
+          ),
+        FormPickerCard(
+          icon: Icons.event_rounded,
+          accent: accent,
+          label: t.date,
+          value: Dates.short(_date),
+          onTap: _pickDate,
+        ),
+        FormTextCard(
+          icon: Icons.notes_rounded,
+          accent: accent,
+          label: t.noteOptional,
+          hint: t.noteHint,
+          controller: _note,
+          maxLines: 2,
+          maxLength: 150,
+          onChanged: (_) => setState(() {}),
+        ),
+        // Expenses only — repaying a loan is never income.
+        if (!isIncome)
+          LoanPaymentField(
+            accent: accent,
+            checked: _isLoanPayment,
+            selectedLoanId: _loanId,
+            showError: _loanTouched,
+            onCheckedChanged: (v) => setState(() {
+              _isLoanPayment = v;
+              if (!v) {
+                _loanId = null;
+                // Unticking resolves the complaint either way.
+                _loanTouched = false;
+                if (_error == t.expenseLoanRequired) _error = null;
+              }
+            }),
+            onLoanSelected: (id) => setState(() {
+              _loanId = id;
+              _loanTouched = false;
+              if (_error == t.expenseLoanRequired) _error = null;
+            }),
+          ),
+        if (_error != null) FormErrorLine(message: _error!),
+      ],
     );
   }
 }
 
-/// Compact, dropdown-style category field. Shows the current selection in a
-/// single row and opens a searchable list sheet — this scales cleanly to any
-/// number of categories, unlike a wrap of chips.
-class _CategoryPicker extends StatelessWidget {
-  final List<Category> categories;
-  final String? selectedId;
-  final ValueChanged<String> onSelect;
-  final String type; // INCOME | EXPENSE — new categories inherit this
-  const _CategoryPicker({
-    required this.categories,
-    required this.selectedId,
-    required this.onSelect,
-    required this.type,
-  });
+/// The selected category's own colour and glyph, shown beside its name.
+class _CategoryDot extends StatelessWidget {
+  const _CategoryDot({required this.category});
+  final Category category;
 
   @override
   Widget build(BuildContext context) {
-    if (categories.isEmpty) {
-      return Text(context.t.noCategory, style: TextStyle(color: context.muted));
-    }
-    final selected = categories.where((c) => c.id == selectedId).firstOrNull;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () async {
-        final id = await showCategoryPickerSheet(
-          context,
-          categories: categories,
-          selectedId: selectedId,
-          type: type,
-        );
-        if (id != null) onSelect(id);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: context.surfaceAlt,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected != null ? selected.color.withValues(alpha: 0.45) : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: (selected?.color ?? context.muted).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(
-                selected != null ? categoryIcon(selected.icon) : Icons.category_rounded,
-                size: 19,
-                color: selected?.color ?? context.muted,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                selected?.name ?? context.t.selectCategory,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: selected != null ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 15,
-                  color: selected != null ? context.colors.onSurface : context.muted,
-                ),
-              ),
-            ),
-            Icon(Icons.expand_more_rounded, color: context.muted),
-          ],
-        ),
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: category.color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(10),
       ),
+      child: Icon(categoryIcon(category.icon), size: 16, color: category.color),
     );
   }
 }

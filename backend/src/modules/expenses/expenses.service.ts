@@ -185,7 +185,8 @@ export class ExpensesService {
         date,
         description: dto.description,
         paymentMethod: dto.paymentMethod,
-        loanId: dto.loanId ?? null,
+        // '' means "no loan"; storing it verbatim would break the foreign key.
+        loanId: dto.loanId || null,
         tags: dto.tags ?? [],
         receiptUrl: dto.receiptUrl,
       },

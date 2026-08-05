@@ -53,6 +53,13 @@ export class NotificationsController {
     return this.notifications.markRead(userId, id);
   }
 
+  // Declared before ':id' so the literal route is never swallowed by the param.
+  @Delete('all')
+  @ApiOperation({ summary: 'Delete every notification of the current user' })
+  removeAll(@CurrentUser('userId') userId: string) {
+    return this.notifications.removeAll(userId);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a notification' })
   remove(@CurrentUser('userId') userId: string, @Param('id') id: string) {

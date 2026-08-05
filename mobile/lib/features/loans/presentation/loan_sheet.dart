@@ -6,6 +6,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/form_kit.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/loan_models.dart';
 import '../providers/loans_provider.dart';
@@ -29,6 +30,8 @@ class LoanSheet extends ConsumerStatefulWidget {
 }
 
 class _LoanSheetState extends ConsumerState<LoanSheet> {
+  static const _accent = AppColors.primary;
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _lender;
@@ -73,7 +76,22 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
   double get _principalValue => double.tryParse(_principal.text.trim()) ?? 0;
   double get _paidValue => double.tryParse(_paid.text.trim()) ?? 0;
 
+  /// Drives the pill in the top bar. The two required fields carry most of the
+  /// weight; the optional ones round it off so a complete form reads as full.
+  double get _completion {
+    final req = [_name.text.trim().isNotEmpty, _principalValue > 0]
+        .where((e) => e)
+        .length;
+    final opt = [
+      _lender.text.trim().isNotEmpty,
+      _endDate != null,
+      _description.text.trim().isNotEmpty,
+    ].where((e) => e).length;
+    return (req / 2) * 0.8 + (opt / 3) * 0.2;
+  }
+
   Future<void> _pickDate({required bool start}) async {
+    FocusScope.of(context).unfocus();
     final initial = start ? _startDate : (_endDate ?? DateTime.now());
     final picked = await showDatePicker(
       context: context,
@@ -141,227 +159,193 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
   Widget build(BuildContext context) {
     final t = context.t;
     final currency = ref.watch(authProvider).user?.currency ?? 'XOF';
+    final currencyLabel = currency == 'XOF' ? 'FCFA' : currency;
     // Live preview of what will remain, so the numbers make sense before saving.
     final remaining = (_principalValue - _paidValue).clamp(0, double.infinity);
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+    return FormSheetShell(
+      accent: _accent,
+      icon: Icons.account_balance_wallet_rounded,
+      title: _isEdit ? t.loanEdit : t.loanNew,
+      formKey: _formKey,
+      progress: _completion,
+      footer: FormPrimaryButton(
+        accent: _accent,
+        label: _isEdit ? t.loanSaveAction : t.loanCreateAction,
+        loading: _saving,
+        onPressed: _saving ? null : _save,
+      ),
+      children: [
+        FormTextCard(
+          icon: Icons.account_balance_rounded,
+          accent: _accent,
+          label: t.loanName,
+          hint: t.loanNameHint,
+          controller: _name,
+          required: true,
+          onChanged: (_) => setState(() {}),
+          validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
         ),
-        padding: EdgeInsets.fromLTRB(
-            20, 12, 20, 20 + MediaQuery.of(context).padding.bottom),
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+        FormTextCard(
+          icon: Icons.storefront_rounded,
+          accent: _accent,
+          label: t.loanLender,
+          hint: t.loanLenderHint,
+          controller: _lender,
+          onChanged: (_) => setState(() {}),
+        ),
+        FormTextCard(
+          icon: Icons.payments_rounded,
+          accent: _accent,
+          label: t.loanPrincipal,
+          hint: '0',
+          controller: _principal,
+          required: true,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          suffix: currencyLabel,
+          onChanged: (_) => setState(() {}),
+          validator: (v) {
+            final n = double.tryParse((v ?? '').trim()) ?? 0;
+            return n <= 0 ? t.required : null;
+          },
+        ),
+        FormTextCard(
+          icon: Icons.history_rounded,
+          accent: _accent,
+          label: t.loanAlreadyPaid,
+          hint: '0',
+          controller: _paid,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          suffix: currencyLabel,
+          onChanged: (_) => setState(() {}),
+          validator: (v) {
+            final n = double.tryParse((v ?? '').trim()) ?? 0;
+            // Caught here as well as server-side so the user gets the
+            // message without a round trip.
+            if (n > _principalValue && _principalValue > 0) {
+              return context.t.loanAlreadyPaidTooHigh;
+            }
+            return null;
+          },
+        ),
+        FormInfoBanner(
+          accent: _accent,
+          text: Text.rich(
+            TextSpan(
+              style: TextStyle(fontSize: 12.5, height: 1.4, color: context.muted),
               children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                        color: context.borderColor,
-                        borderRadius: BorderRadius.circular(4)),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(_isEdit ? t.loanEdit : t.loanNew,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 18),
-
-                TextFormField(
-                  controller: _name,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    labelText: t.loanName,
-                    hintText: t.loanNameHint,
-                    prefixIcon: const Icon(Icons.account_balance_rounded, size: 20),
-                  ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? t.required : null,
-                ),
-                const SizedBox(height: 14),
-
-                TextFormField(
-                  controller: _lender,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    labelText: t.loanLender,
-                    hintText: t.loanLenderHint,
-                    prefixIcon: const Icon(Icons.storefront_rounded, size: 20),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                TextFormField(
-                  controller: _principal,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    labelText: t.loanPrincipal,
-                    prefixIcon: const Icon(Icons.payments_rounded, size: 20),
-                    suffixText: currency == 'XOF' ? 'FCFA' : currency,
-                  ),
-                  validator: (v) {
-                    final n = double.tryParse((v ?? '').trim()) ?? 0;
-                    return n <= 0 ? t.required : null;
-                  },
-                ),
-                const SizedBox(height: 14),
-
-                TextFormField(
-                  controller: _paid,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    labelText: t.loanAlreadyPaid,
-                    prefixIcon: const Icon(Icons.history_rounded, size: 20),
-                    suffixText: currency == 'XOF' ? 'FCFA' : currency,
-                  ),
-                  validator: (v) {
-                    final n = double.tryParse((v ?? '').trim()) ?? 0;
-                    // Caught here as well as server-side so the user gets the
-                    // message without a round trip.
-                    if (n > _principalValue && _principalValue > 0) {
-                      return context.t.loanAlreadyPaidTooHigh;
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 6),
-                Text(t.loanAlreadyPaidHelp,
-                    style: TextStyle(fontSize: 11, height: 1.35, color: context.muted)),
-                const SizedBox(height: 16),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: _DateField(
-                        label: t.loanStartDate,
-                        value: Dates.short(_startDate),
-                        onTap: () => _pickDate(start: true),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _DateField(
-                        label: t.loanEndDate,
-                        value: _endDate == null ? t.loanNoEndDate : Dates.short(_endDate!),
-                        onTap: () => _pickDate(start: false),
-                        onClear: _endDate == null
-                            ? null
-                            : () => setState(() => _endDate = null),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                TextFormField(
-                  controller: _description,
-                  maxLines: 2,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(labelText: t.loanDescription),
-                ),
-
-                if (_principalValue > 0) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.trending_down_rounded,
-                            size: 17, color: AppColors.primary),
-                        const SizedBox(width: 10),
-                        Text('${t.loanRemaining} : ',
-                            style: const TextStyle(fontSize: 12.5)),
-                        Text(
-                          Money.format(remaining, currency),
-                          style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primary),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(_error!,
-                      style: const TextStyle(color: AppColors.danger, fontSize: 12.5)),
-                ],
-
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 52,
-                  child: FilledButton(
-                    onPressed: _saving ? null : _save,
-                    style: FilledButton.styleFrom(
-                      shape:
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: _saving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2.2))
-                        : Text(_isEdit ? t.save : t.create,
-                            style: const TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w700)),
-                  ),
-                ),
+                TextSpan(text: t.loanAlreadyPaidHelp),
               ],
             ),
           ),
         ),
-      ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: FormCompactPicker(
+                icon: Icons.event_rounded,
+                accent: _accent,
+                label: t.loanStartDate,
+                value: Dates.short(_startDate),
+                onTap: () => _pickDate(start: true),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FormCompactPicker(
+                icon: Icons.event_available_rounded,
+                accent: _accent,
+                label: t.loanEndDate,
+                value: _endDate == null ? t.loanNoEndDate : Dates.short(_endDate!),
+                placeholder: _endDate == null,
+                onTap: () => _pickDate(start: false),
+                onClear:
+                    _endDate == null ? null : () => setState(() => _endDate = null),
+              ),
+            ),
+          ],
+        ),
+        FormTextCard(
+          icon: Icons.description_rounded,
+          accent: _accent,
+          label: t.loanDescription,
+          hint: t.loanDescriptionHint,
+          controller: _description,
+          maxLines: 2,
+          maxLength: 150,
+          onChanged: (_) => setState(() {}),
+        ),
+        if (_principalValue > 0)
+          _RemainingPreview(
+            label: t.loanRemaining,
+            amount: Money.format(remaining.toDouble(), currency),
+          ),
+        if (_error != null) FormErrorLine(message: _error!),
+      ],
     );
   }
 }
 
-class _DateField extends StatelessWidget {
-  const _DateField({
-    required this.label,
-    required this.value,
-    required this.onTap,
-    this.onClear,
-  });
+/// Live "what will be left" summary — the one number the user is really after.
+class _RemainingPreview extends StatelessWidget {
+  const _RemainingPreview({required this.label, required this.amount});
   final String label;
-  final String value;
-  final VoidCallback onTap;
-  final VoidCallback? onClear;
+  final String amount;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: const Icon(Icons.event_rounded, size: 19),
-          suffixIcon: onClear == null
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 16),
-                  onPressed: onClear,
-                ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: FormKit.cardGap),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(FormKit.cardRadius),
+          gradient: AppColors.heroGradient,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.28),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        child: Text(value, style: const TextStyle(fontSize: 13.5)),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: const Icon(Icons.trending_down_rounded,
+                  size: 19, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+            ),
+            Text(
+              amount,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

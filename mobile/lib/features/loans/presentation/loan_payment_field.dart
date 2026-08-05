@@ -4,15 +4,20 @@ import '../../../core/i18n/app_text.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/form_kit.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/loans_provider.dart';
 import 'loan_sheet.dart';
 
-/// "This repays a loan" checkbox plus the loan picker it reveals.
+/// "This repays a loan" toggle plus the loan picker it reveals.
 ///
 /// When the user has no loans yet, the picker is replaced by an explanation and
 /// a shortcut to create one — ticking the box then leads somewhere useful
 /// instead of showing an empty dropdown.
+///
+/// Ticking the box is a claim that this expense repays a loan, so it is only
+/// complete once a loan is picked. [showError] is raised by the parent form
+/// when the user tries to save while that claim is still unfulfilled.
 class LoanPaymentField extends ConsumerWidget {
   const LoanPaymentField({
     super.key,
@@ -20,6 +25,8 @@ class LoanPaymentField extends ConsumerWidget {
     required this.selectedLoanId,
     required this.onCheckedChanged,
     required this.onLoanSelected,
+    this.accent = AppColors.danger,
+    this.showError = false,
   });
 
   final bool checked;
@@ -27,96 +34,131 @@ class LoanPaymentField extends ConsumerWidget {
   final ValueChanged<bool> onCheckedChanged;
   final ValueChanged<String?> onLoanSelected;
 
+  /// Matches the host form (red on expenses). The loans themselves keep the
+  /// brand indigo so the link back to the Loans tab stays readable.
+  final Color accent;
+  final bool showError;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.t;
     final currency = ref.watch(authProvider).user?.currency ?? 'XOF';
     final async = ref.watch(selectableLoansProvider);
+    final invalid = showError && checked && selectedLoanId == null;
+    final tint = invalid ? AppColors.danger : accent;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: checked ? AppColors.primary.withValues(alpha: 0.05) : context.surfaceAlt,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: checked ? AppColors.primary.withValues(alpha: 0.35) : Colors.transparent,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: FormKit.cardGap),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(FormKit.cardRadius),
+          border: Border.all(
+            width: 1.4,
+            color: invalid
+                ? AppColors.danger
+                : checked
+                    ? accent.withValues(alpha: 0.45)
+                    : Colors.transparent,
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () => onCheckedChanged(!checked),
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: Checkbox(
-                      value: checked,
-                      onChanged: (v) => onCheckedChanged(v ?? false),
-                      shape:
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                      activeColor: AppColors.primary,
+        child: Column(
+          children: [
+            InkWell(
+              onTap: () => onCheckedChanged(!checked),
+              borderRadius: BorderRadius.circular(FormKit.cardRadius),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: FormKit.iconTile,
+                      height: FormKit.iconTile,
+                      decoration: BoxDecoration(
+                        color: tint.withValues(alpha: context.isDark ? 0.20 : 0.11),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(Icons.account_balance_rounded, size: 24, color: tint),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Icon(Icons.account_balance_rounded,
-                      size: 18,
-                      color: checked ? AppColors.primary : context.muted),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      t.expenseIsLoanPayment,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: checked ? FontWeight.w700 : FontWeight.w600,
-                        color: checked ? AppColors.primary : context.colors.onSurface,
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            t.expenseIsLoanPayment,
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w700, height: 1.2),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            checked ? t.expenseChooseLoan : t.expenseLoanToggleHint,
+                            maxLines: 2,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.3,
+                              color: invalid ? AppColors.danger : context.muted,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (checked)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: async.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.2),
-                  ),
+                    Switch.adaptive(
+                      value: checked,
+                      activeThumbColor: Colors.white,
+                      activeTrackColor: tint,
+                      onChanged: onCheckedChanged,
+                    ),
+                  ],
                 ),
-                error: (e, _) => Text(e.toString(),
-                    style: const TextStyle(fontSize: 12, color: AppColors.danger)),
-                data: (loans) {
-                  if (loans.isEmpty) return _NoLoansYet(onCreated: () => refreshLoansFrom(ref));
-                  return Column(
-                    children: [
-                      for (final l in loans)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _LoanOption(
-                            name: l.name,
-                            remaining: l.remaining,
-                            progress: l.progress,
-                            suggested: l.suggestedMonthlyPayment,
-                            currency: currency,
-                            selected: selectedLoanId == l.id,
-                            onTap: () => onLoanSelected(l.id),
-                          ),
-                        ),
-                    ],
-                  );
-                },
               ),
             ),
-        ],
+            if (checked)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: async.when(
+                  loading: () => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    ),
+                  ),
+                  error: (e, _) => Text(e.toString(),
+                      style: const TextStyle(fontSize: 12, color: AppColors.danger)),
+                  data: (loans) {
+                    if (loans.isEmpty) {
+                      return _NoLoansYet(
+                        onCreated: () => refreshLoansFrom(ref),
+                        onUncheck: () => onCheckedChanged(false),
+                      );
+                    }
+                    return Column(
+                      children: [
+                        for (final l in loans)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _LoanOption(
+                              name: l.name,
+                              remaining: l.remaining,
+                              progress: l.progress,
+                              suggested: l.suggestedMonthlyPayment,
+                              currency: currency,
+                              selected: selectedLoanId == l.id,
+                              onTap: () => onLoanSelected(l.id),
+                            ),
+                          ),
+                        if (invalid) _RequiredHint(message: t.expenseLoanRequired),
+                      ],
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -145,15 +187,18 @@ class _LoanOption extends StatelessWidget {
     final t = context.t;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(13),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
         decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: BorderRadius.circular(13),
+          color: selected
+              ? AppColors.primary.withValues(alpha: context.isDark ? 0.18 : 0.07)
+              : context.surfaceAlt,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: selected ? AppColors.primary : context.borderColor,
-            width: selected ? 1.6 : 1,
+            color: selected ? AppColors.primary : Colors.transparent,
+            width: 1.5,
           ),
         ),
         child: Row(
@@ -162,10 +207,10 @@ class _LoanOption extends StatelessWidget {
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_unchecked_rounded,
-              size: 18,
+              size: 19,
               color: selected ? AppColors.primary : context.muted,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 11),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,7 +220,7 @@ class _LoanOption extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700)),
+                          fontSize: 13.5, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 3),
                   Row(
                     children: [
@@ -188,13 +233,13 @@ class _LoanOption extends StatelessWidget {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 7),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: (progress / 100).clamp(0.0, 1.0),
                       minHeight: 4,
-                      backgroundColor: context.surfaceAlt,
+                      backgroundColor: context.borderColor,
                       valueColor: const AlwaysStoppedAnimation(AppColors.primary),
                     ),
                   ),
@@ -208,10 +253,39 @@ class _LoanOption extends StatelessWidget {
   }
 }
 
-/// Shown when the checkbox is ticked but no loans exist.
+/// Inline "you must still pick a loan" message, shown once the user has tried
+/// to save with the box ticked and nothing selected.
+class _RequiredHint extends StatelessWidget {
+  const _RequiredHint({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 1),
+          child: Icon(Icons.error_outline_rounded, size: 15, color: AppColors.danger),
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            message,
+            style: const TextStyle(
+                fontSize: 12, height: 1.35, color: AppColors.danger),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shown when the toggle is on but no loans exist.
 class _NoLoansYet extends StatelessWidget {
-  const _NoLoansYet({required this.onCreated});
+  const _NoLoansYet({required this.onCreated, required this.onUncheck});
   final VoidCallback onCreated;
+  final VoidCallback onUncheck;
 
   @override
   Widget build(BuildContext context) {
@@ -220,17 +294,20 @@ class _NoLoansYet extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: context.borderColor),
+        color: context.surfaceAlt,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.info_outline_rounded,
-                  size: 16, color: AppColors.warning),
+              const Padding(
+                padding: EdgeInsets.only(top: 1),
+                child: Icon(Icons.info_outline_rounded,
+                    size: 16, color: AppColors.warning),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(t.expenseNoLoanYet,
@@ -239,21 +316,38 @@ class _NoLoansYet extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            height: 40,
-            child: OutlinedButton.icon(
-              onPressed: () async {
-                final created = await showLoanSheet(context);
-                if (created == true) onCreated();
-              },
-              icon: const Icon(Icons.add_rounded, size: 17),
-              label: Text(t.loanCreateFirst, style: const TextStyle(fontSize: 13)),
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      final created = await showLoanSheet(context);
+                      if (created == true) onCreated();
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 17),
+                    label: Text(t.loanCreateFirst,
+                        style: const TextStyle(fontSize: 13)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13)),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 42,
+                child: TextButton(
+                  onPressed: onUncheck,
+                  child: Text(t.expenseUntickLoan,
+                      style: const TextStyle(fontSize: 13)),
+                ),
+              ),
+            ],
           ),
         ],
       ),

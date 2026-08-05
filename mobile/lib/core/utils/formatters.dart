@@ -40,6 +40,10 @@ class Dates {
     return '$date ${dateLocale.startsWith('fr') ? 'à' : 'at'} $time';
   }
 
+  /// Clock time only, e.g. "07:00".
+  static String hourMinute(DateTime d) =>
+      DateFormat('HH:mm', dateLocale).format(d);
+
   /// Relative label for recent items ("Il y a 5 min"), falling back to the
   /// absolute date+time for anything older than a day.
   static String relative(DateTime d) {

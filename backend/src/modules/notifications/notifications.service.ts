@@ -240,4 +240,10 @@ export class NotificationsService {
     await this.prisma.notification.deleteMany({ where: { id, userId } });
     return { message: 'Deleted' };
   }
+
+  /// Scoped to the caller — a user can only ever clear their own inbox.
+  async removeAll(userId: string) {
+    const { count } = await this.prisma.notification.deleteMany({ where: { userId } });
+    return { message: 'All deleted', count };
+  }
 }
