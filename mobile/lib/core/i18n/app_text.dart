@@ -351,9 +351,15 @@ class AppText {
   String get budgetEditOverall =>
       _s('Modifier le budget du mois', 'Edit the monthly budget');
 
+  // Tabs
+  String get budgetTabCategories => _s('Par catégorie', 'By category');
+  String get budgetTabMonth => _s('Mois entier', 'Whole month');
+
   // Category coverage — deliberately NOT called "the month's budget".
   String get budgetCoverageTitle =>
-      _s('Total des budgets par catégorie', 'Total of category budgets');
+      _s('Budget total des catégories', 'Total category budget');
+  String budgetCoverageCount(int n) =>
+      _s('$n catégorie${n > 1 ? 's' : ''}', '$n categor${n > 1 ? 'ies' : 'y'}');
   String get budgetCoverageHint => _s(
         'Somme de vos plafonds par catégorie — ce n’est pas le budget du mois.',
         'The sum of your category caps — not the month’s budget.',
@@ -383,12 +389,14 @@ class AppText {
   String get budgetRepeat => _s('Répéter sur', 'Repeat for');
   String budgetRepeatMonths(int n) =>
       _s('$n mois', '$n month${n > 1 ? 's' : ''}');
-  String get budgetRepeatOnce => _s('Ce mois seulement', 'This month only');
+  // Short on purpose: this label shares a row with three others, so anything
+  // longer overflows its chip.
+  String get budgetRepeatOnce => _s('Ce mois', 'This month');
   String get budgetRepeatHint => _s(
-        'Chaque mois reçoit son propre budget, indépendant : modifier ou dépasser '
-            'un mois ne change jamais l’historique des autres.',
-        'Each month gets its own independent budget: editing or overspending one '
-            'month never changes what the others recorded.',
+        'Chaque mois reste indépendant : modifier ou dépasser un mois ne change '
+            'pas l’historique des autres.',
+        'Each month stays independent: editing or overspending one never changes '
+            'the others.',
       );
   String get budgetRepeatingBadge => _s('Récurrent', 'Repeating');
   String get budgetDeleteSeries =>

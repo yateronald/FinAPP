@@ -13,17 +13,157 @@ import '../data/budget_models.dart';
 import '../providers/budgets_provider.dart';
 import 'set_budget_sheet.dart';
 
-/// Budgets for one month, in two independent layers:
+/// Budgets, split into the two things they actually are:
 ///
-///  1. the **overall cap** — one number for the whole month, that every
-///     expense counts against;
-///  2. the **category budgets** — caps per category, whose sum is a coverage
-///     figure and never the month's budget.
+///  * **By category** — a cap per category. Their sum is a coverage figure.
+///  * **Whole month** — ONE cap that every expense counts against, whatever
+///    its category.
 ///
-/// Keeping them apart is the point: a user can sit inside every category cap
-/// and still blow through the month.
-class BudgetsScreen extends ConsumerWidget {
+/// They live in separate tabs because conflating them is what made the old
+/// header claim a "monthly budget" the user had never set: a user can sit
+/// inside every category cap and still blow through the month.
+class BudgetsScreen extends ConsumerStatefulWidget {
   const BudgetsScreen({super.key});
+
+  @override
+  ConsumerState<BudgetsScreen> createState() => _BudgetsScreenState();
+}
+
+class _BudgetsScreenState extends ConsumerState<BudgetsScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final month = ref.watch(budgetMonthProvider);
+
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: context.surfaceAlt,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: TabBar(
+            controller: _tab,
+            dividerColor: Colors.transparent,
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: BoxDecoration(
+              color: context.colors.surface,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 6),
+              ],
+            ),
+            labelColor: AppColors.primary,
+            unselectedLabelColor: context.muted,
+            labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+            tabs: [
+              Tab(text: t.budgetTabCategories),
+              Tab(text: t.budgetTabMonth),
+            ],
+          ),
+        ),
+        _MonthSwitcher(month: month, ref: ref),
+        Expanded(
+          child: TabBarView(
+            controller: _tab,
+            children: const [_CategoriesTab(), _MonthTab()],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════ tab 1 — categories
+
+class _CategoriesTab extends ConsumerWidget {
+  const _CategoriesTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.t;
+    final async = ref.watch(budgetOverviewProvider);
+    final currency = ref.watch(authProvider).user?.currency ?? 'XOF';
+
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => _ErrorState(message: e.toString()),
+      data: (data) {
+        final cats = data.categories;
+        final totals = data.totals;
+
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => _refresh(ref),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+            children: [
+              if (cats.isEmpty)
+                const _CategoriesEmpty()
+              else ...[
+                _HeroCard(
+                  title: t.budgetCoverageTitle,
+                  badge: t.budgetCoverageCount(totals.categoryCount),
+                  spent: totals.spentOnBudgeted,
+                  budget: totals.budgeted,
+                  currency: currency,
+                  footer: _StatusLegend(totals: totals),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(t.budgetCoverageHint,
+                      style: TextStyle(
+                          fontSize: 11.5, height: 1.35, color: context.muted)),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(t.byCategory,
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w700)),
+                    ),
+                    _AddChip(
+                      onTap: () =>
+                          showSetBudgetSheet(context, kind: BudgetKind.category),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...cats.asMap().entries.map((e) =>
+                    _BudgetCard(b: e.value, currency: currency, index: e.key)),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════ tab 2 — whole month
+
+class _MonthTab extends ConsumerWidget {
+  const _MonthTab();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,133 +172,103 @@ class BudgetsScreen extends ConsumerWidget {
     final month = ref.watch(budgetMonthProvider);
     final currency = ref.watch(authProvider).user?.currency ?? 'XOF';
 
-    return Column(
-      children: [
-        _MonthSwitcher(month: month, ref: ref),
-        Expanded(
-          child: async.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text(e.toString())),
-            data: (data) => RefreshIndicator(
-              color: AppColors.primary,
-              onRefresh: () async {
-                ref.invalidate(budgetOverviewProvider);
-                await ref.read(budgetOverviewProvider.future);
-              },
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
-                children: [
-                  // ── 1. The month as a whole ──────────────────────────
-                  _SectionTitle(
-                    title: t.budgetOverallTitle,
-                    subtitle: t.budgetOverallSubtitle,
-                  ),
-                  const SizedBox(height: 10),
-                  if (data.overall == null)
-                    const _OverallEmptyCard()
-                  else
-                    _OverallBudgetCard(
-                      overall: data.overall!,
-                      currency: currency,
-                      month: month,
-                    ),
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => _ErrorState(message: e.toString()),
+      data: (data) {
+        final overall = data.overall;
 
-                  const SizedBox(height: 24),
-                  RealAiAnalyticsWidget(date: month, scope: 'BUDGET'),
-
-                  // ── 2. Category caps ─────────────────────────────────
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(t.byCategory,
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w700)),
-                      ),
-                      _AddChip(
-                        onTap: () => showSetBudgetSheet(context,
-                            kind: BudgetKind.category),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  if (data.categories.isEmpty)
-                    const _CategoriesEmpty()
-                  else ...[
-                    _CoverageCard(totals: data.totals, currency: currency),
-                    const SizedBox(height: 14),
-                    ...data.categories.asMap().entries.map((e) => _BudgetCard(
-                          b: e.value,
-                          currency: currency,
-                          index: e.key,
-                          month: month,
-                        )),
-                  ],
-                ],
-              ),
-            ),
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => _refresh(ref),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+            children: [
+              if (overall == null)
+                const _OverallEmptyCard()
+              else ...[
+                _HeroCard(
+                  title: t.budgetOverallTitle,
+                  badge: Dates.monthYear(month),
+                  spent: overall.spent,
+                  budget: overall.budget,
+                  currency: currency,
+                  danger: overall.isOver,
+                  trailing: _OverallMenu(overall: overall),
+                  repeating: overall.isRepeating,
+                  footer: _PaceFooter(overall: overall, currency: currency),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(t.budgetOverallSubtitle,
+                      style: TextStyle(
+                          fontSize: 11.5, height: 1.35, color: context.muted)),
+                ),
+              ],
+              const SizedBox(height: 22),
+              // AI reads the month as a whole — this is where its advice belongs.
+              RealAiAnalyticsWidget(date: month, scope: 'BUDGET'),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, required this.subtitle});
-  final String title, subtitle;
+Future<void> _refresh(WidgetRef ref) async {
+  ref.invalidate(budgetOverviewProvider);
+  await ref.read(budgetOverviewProvider.future);
+}
+
+// ══════════════════════════════════════════════════════════════ hero card
+
+/// The one card design both tabs share: gradient, progress ring, the two
+/// amounts, what is left, and a tab-specific footer strip.
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({
+    required this.title,
+    required this.badge,
+    required this.spent,
+    required this.budget,
+    required this.currency,
+    required this.footer,
+    this.danger = false,
+    this.repeating = false,
+    this.trailing,
+  });
+
+  final String title, badge, currency;
+  final double spent, budget;
+  final Widget footer;
+  final bool danger, repeating;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 3),
-        Text(subtitle,
-            style: TextStyle(fontSize: 12, height: 1.35, color: context.muted)),
-      ],
-    );
-  }
-}
-
-// ══════════════════════════════════════════════ overall (month-wide) budget
-
-class _OverallBudgetCard extends ConsumerWidget {
-  const _OverallBudgetCard({
-    required this.overall,
-    required this.currency,
-    required this.month,
-  });
-
-  final OverallBudgetStatus overall;
-  final String currency;
-  final DateTime month;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.t;
-    final over = overall.isOver;
-    final progress = overall.budget > 0 ? overall.spent / overall.budget : 0.0;
+    final over = spent > budget;
+    final remaining = budget - spent;
+    final progress = budget > 0 ? spent / budget : 0.0;
+    final alarm = danger || over;
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
       decoration: BoxDecoration(
-        gradient: over
+        gradient: alarm
             ? const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFFDC2626), Color(0xFF9F1239)],
+                colors: [Color(0xFFE11D48), Color(0xFF9F1239)],
               )
             : AppColors.heroGradient,
         borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: (over ? AppColors.danger : AppColors.primary)
-                .withValues(alpha: 0.30),
-            blurRadius: 22,
+            color: (alarm ? AppColors.danger : AppColors.primary)
+                .withValues(alpha: 0.32),
+            blurRadius: 24,
             offset: const Offset(0, 10),
           ),
         ],
@@ -167,17 +277,24 @@ class _OverallBudgetCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Text(Dates.monthYear(month),
-                  style: const TextStyle(
-                      color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-              const Spacer(),
-              if (overall.isRepeating)
-                _Pill(icon: Icons.repeat_rounded, label: t.budgetRepeatingBadge),
-              const SizedBox(width: 6),
-              _OverallMenu(overall: overall, month: month),
+              Expanded(
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700)),
+              ),
+              if (repeating) ...[
+                const _Chip(icon: Icons.repeat_rounded),
+                const SizedBox(width: 6),
+              ],
+              _Chip(label: badge),
+              ?trailing,
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
           Row(
             children: [
               _Ring(progress: progress, over: over),
@@ -185,17 +302,18 @@ class _OverallBudgetCard extends ConsumerWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
-                      child: Text(Money.format(overall.spent, currency),
+                      child: Text(Money.format(spent, currency),
                           style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 24,
+                              fontSize: 25,
                               fontWeight: FontWeight.w800)),
                     ),
-                    Text('${t.onOf} ${Money.format(overall.budget, currency)}',
+                    Text('${t.onOf} ${Money.format(budget, currency)}',
                         style: const TextStyle(color: Colors.white70, fontSize: 13)),
                     const SizedBox(height: 12),
                     _Pill(
@@ -203,97 +321,42 @@ class _OverallBudgetCard extends ConsumerWidget {
                           ? Icons.warning_amber_rounded
                           : Icons.account_balance_wallet_rounded,
                       label: over
-                          ? t.overLabel(
-                              Money.format(overall.remaining.abs(), currency))
-                          : t.remainingLabel(
-                              Money.format(overall.remaining, currency)),
+                          ? t.overLabel(Money.format(remaining.abs(), currency))
+                          : t.remainingLabel(Money.format(remaining, currency)),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          // Pace: being under the cap on the 28th means something very
-          // different from being under it on the 3rd.
-          if (overall.expectedProgress != null) ...[
-            const SizedBox(height: 16),
-            Divider(color: Colors.white.withValues(alpha: 0.18), height: 1),
-            const SizedBox(height: 12),
-            _PaceRow(overall: overall, currency: currency),
-          ],
-          if (overall.uncategorisedSpend > 0) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Icon(Icons.visibility_off_rounded,
-                    size: 14, color: Colors.white.withValues(alpha: 0.75)),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: Text(
-                    t.budgetUnwatched(
-                        Money.format(overall.uncategorisedSpend, currency)),
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85), fontSize: 11.5),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          const SizedBox(height: 16),
+          Divider(color: Colors.white.withValues(alpha: 0.18), height: 1),
+          const SizedBox(height: 13),
+          footer,
         ],
       ),
     ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.06, end: 0);
   }
 }
 
-class _PaceRow extends StatelessWidget {
-  const _PaceRow({required this.overall, required this.currency});
-  final OverallBudgetStatus overall;
-  final String currency;
+class _Chip extends StatelessWidget {
+  const _Chip({this.label, this.icon});
+  final String? label;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
-    final t = context.t;
-    final closed = overall.daysLeft == 0;
-    final ahead = overall.isAheadOfPace;
-
-    return Row(
-      children: [
-        Icon(
-          closed
-              ? Icons.event_available_rounded
-              : ahead
-                  ? Icons.speed_rounded
-                  : Icons.check_circle_rounded,
-          size: 15,
-          color: ahead ? const Color(0xFFFDE047) : Colors.white,
-        ),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Text(
-            closed
-                ? t.budgetMonthClosed
-                : ahead
-                    ? t.budgetAheadOfPace
-                    : t.budgetOnPace,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: ahead ? const Color(0xFFFDE047) : Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        if (!closed && overall.daysLeft != null)
-          Text(
-            overall.safeDailySpend != null && overall.remaining > 0
-                ? t.budgetSafeDaily(
-                    Money.compact(overall.safeDailySpend!))
-                : t.budgetDaysLeft(overall.daysLeft!),
-            style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.85), fontSize: 11.5),
-          ),
-      ],
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: label == null ? 7 : 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: icon != null
+          ? Icon(icon, size: 13, color: Colors.white)
+          : Text(label!,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
     );
   }
 }
@@ -306,7 +369,7 @@ class _Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.17),
         borderRadius: BorderRadius.circular(12),
@@ -314,21 +377,138 @@ class _Pill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
+          Icon(icon, size: 15, color: Colors.white),
           const SizedBox(width: 6),
-          Text(label,
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+          Flexible(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700)),
+          ),
         ],
       ),
     );
   }
 }
 
-class _OverallMenu extends ConsumerWidget {
-  const _OverallMenu({required this.overall, required this.month});
+/// Footer of the categories card: how many caps are healthy, at risk, blown.
+class _StatusLegend extends StatelessWidget {
+  const _StatusLegend({required this.totals});
+  final BudgetTotals totals;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Row(
+      children: [
+        _item(const Color(0xFF86EFAC), totals.onTrack, t.statusOk),
+        _item(const Color(0xFFFDE68A), totals.atRisk, t.statusWarning),
+        _item(const Color(0xFFFCA5A5), totals.exceeded, t.statusExceeded),
+      ],
+    );
+  }
+
+  Widget _item(Color color, int count, String label) => Expanded(
+        child: Row(
+          children: [
+            Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+            const SizedBox(width: 6),
+            Text('$count',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            ),
+          ],
+        ),
+      );
+}
+
+/// Footer of the month card: being under the cap on the 28th means something
+/// very different from being under it on the 3rd.
+class _PaceFooter extends StatelessWidget {
+  const _PaceFooter({required this.overall, required this.currency});
   final OverallBudgetStatus overall;
-  final DateTime month;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final closed = overall.daysLeft == 0;
+    final ahead = overall.isAheadOfPace;
+    final accent = ahead ? const Color(0xFFFDE047) : Colors.white;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Icon(
+              closed
+                  ? Icons.event_available_rounded
+                  : ahead
+                      ? Icons.speed_rounded
+                      : Icons.check_circle_rounded,
+              size: 15,
+              color: accent,
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                closed
+                    ? t.budgetMonthClosed
+                    : ahead
+                        ? t.budgetAheadOfPace
+                        : t.budgetOnPace,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: accent, fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (!closed && overall.daysLeft != null)
+              Text(
+                overall.safeDailySpend != null && overall.remaining > 0
+                    ? t.budgetSafeDaily(Money.compact(overall.safeDailySpend!))
+                    : t.budgetDaysLeft(overall.daysLeft!),
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85), fontSize: 11.5),
+              ),
+          ],
+        ),
+        if (overall.uncategorisedSpend > 0) ...[
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              Icon(Icons.visibility_off_rounded,
+                  size: 14, color: Colors.white.withValues(alpha: 0.75)),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  t.budgetUnwatched(
+                      Money.format(overall.uncategorisedSpend, currency)),
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85), fontSize: 11.5),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _OverallMenu extends ConsumerWidget {
+  const _OverallMenu({required this.overall});
+  final OverallBudgetStatus overall;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -343,10 +523,9 @@ class _OverallMenu extends ConsumerWidget {
               kind: BudgetKind.overall, currentAmount: overall.budget);
           return;
         }
-        await ref.read(budgetsRepositoryProvider).removeOverall(
-              overall.id,
-              withSeries: v == 'delete-series',
-            );
+        await ref
+            .read(budgetsRepositoryProvider)
+            .removeOverall(overall.id, withSeries: v == 'delete-series');
         ref.invalidate(budgetOverviewProvider);
       },
       itemBuilder: (_) => [
@@ -359,6 +538,8 @@ class _OverallMenu extends ConsumerWidget {
   }
 }
 
+// ═════════════════════════════════════════════════════════════ empty states
+
 class _OverallEmptyCard extends StatelessWidget {
   const _OverallEmptyCard();
 
@@ -367,11 +548,17 @@ class _OverallEmptyCard extends StatelessWidget {
     final t = context.t;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+        gradient: AppColors.heroGradient,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.28),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,27 +566,30 @@ class _OverallEmptyCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.11),
-                  borderRadius: BorderRadius.circular(14),
+                  color: Colors.white.withValues(alpha: 0.20),
+                  borderRadius: BorderRadius.circular(15),
                 ),
                 child: const Icon(Icons.pie_chart_rounded,
-                    color: AppColors.primary, size: 22),
+                    color: Colors.white, size: 23),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 13),
               Expanded(
                 child: Text(t.budgetOverallNone,
                     style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w800)),
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800)),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Text(t.budgetOverallNoneBody,
-              style: TextStyle(fontSize: 12.5, height: 1.45, color: context.muted)),
-          const SizedBox(height: 16),
+              style: const TextStyle(
+                  color: Colors.white70, fontSize: 12.5, height: 1.45)),
+          const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
             height: 46,
@@ -409,6 +599,9 @@ class _OverallEmptyCard extends StatelessWidget {
               icon: const Icon(Icons.add_rounded, size: 18),
               label: Text(t.budgetSetOverall),
               style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.primary,
+                textStyle: const TextStyle(fontWeight: FontWeight.w700),
                 shape:
                     RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
@@ -416,103 +609,8 @@ class _OverallEmptyCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.06, end: 0);
   }
-}
-
-// ═════════════════════════════════════════════════════ category coverage
-
-/// Sum of the category caps. Labelled as coverage, never as "the month's
-/// budget" — that claim belongs to [_OverallBudgetCard] alone.
-class _CoverageCard extends StatelessWidget {
-  const _CoverageCard({required this.totals, required this.currency});
-  final BudgetTotals totals;
-  final String currency;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    final progress =
-        totals.budgeted > 0 ? totals.spentOnBudgeted / totals.budgeted : 0.0;
-    final over = totals.spentOnBudgeted > totals.budgeted;
-    final barColor = over ? AppColors.danger : AppColors.primary;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(t.budgetCoverageTitle,
-                    style: const TextStyle(
-                        fontSize: 13.5, fontWeight: FontWeight.w700)),
-              ),
-              Text(
-                '${Money.compact(totals.spentOnBudgeted)} / ${Money.compact(totals.budgeted)}',
-                style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w800, color: barColor),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(t.budgetCoverageHint,
-              style: TextStyle(fontSize: 11, height: 1.35, color: context.muted)),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Stack(
-              children: [
-                Container(height: 8, color: context.surfaceAlt),
-                FractionallySizedBox(
-                  widthFactor: progress.clamp(0, 1).toDouble(),
-                  child: Container(height: 8, color: barColor),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _legend(AppColors.success, totals.onTrack, t.statusOk),
-              _legend(AppColors.warning, totals.atRisk, t.statusWarning),
-              _legend(AppColors.danger, totals.exceeded, t.statusExceeded),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _legend(Color color, int count, String label) => Expanded(
-        child: Row(
-          children: [
-            Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-            const SizedBox(width: 6),
-            Text('$count',
-                style:
-                    const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Builder(
-                builder: (context) => Text(label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: context.muted, fontSize: 10.5)),
-              ),
-            ),
-          ],
-        ),
-      );
 }
 
 class _CategoriesEmpty extends StatelessWidget {
@@ -523,19 +621,29 @@ class _CategoriesEmpty extends StatelessWidget {
     final t = context.t;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 34),
       decoration: BoxDecoration(
-        color: context.surfaceAlt,
-        borderRadius: BorderRadius.circular(20),
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: context.borderColor),
       ),
       child: Column(
         children: [
-          Icon(Icons.savings_rounded, size: 34, color: context.muted),
-          const SizedBox(height: 12),
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.09),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.savings_rounded,
+                size: 34, color: AppColors.primary),
+          ),
+          const SizedBox(height: 18),
           Text(t.noBudget,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: context.muted)),
-          const SizedBox(height: 14),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 18),
           FilledButton.icon(
             onPressed: () =>
                 showSetBudgetSheet(context, kind: BudgetKind.category),
@@ -548,7 +656,31 @@ class _CategoriesEmpty extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════ chrome
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 38, color: context.muted),
+            const SizedBox(height: 14),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, color: context.muted)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════ chrome
 
 class _MonthSwitcher extends StatelessWidget {
   final DateTime month;
@@ -558,7 +690,7 @@ class _MonthSwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       child: Center(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
@@ -601,6 +733,7 @@ class _MonthSwitcher extends StatelessWidget {
 class _AddChip extends StatelessWidget {
   final VoidCallback onTap;
   const _AddChip({required this.onTap});
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -619,7 +752,9 @@ class _AddChip extends StatelessWidget {
             const SizedBox(width: 4),
             Text(context.t.add,
                 style: const TextStyle(
-                    color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5)),
           ],
         ),
       ),
@@ -631,6 +766,7 @@ class _Ring extends StatelessWidget {
   final double progress;
   final bool over;
   const _Ring({required this.progress, required this.over});
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -645,7 +781,8 @@ class _Ring extends StatelessWidget {
             child: CircularProgressIndicator(
               value: 1,
               strokeWidth: 9,
-              valueColor: AlwaysStoppedAnimation(Colors.white.withValues(alpha: 0.22)),
+              valueColor:
+                  AlwaysStoppedAnimation(Colors.white.withValues(alpha: 0.22)),
             ),
           ),
           SizedBox(
@@ -655,7 +792,8 @@ class _Ring extends StatelessWidget {
               value: progress.clamp(0, 1).toDouble(),
               strokeWidth: 9,
               strokeCap: StrokeCap.round,
-              valueColor: AlwaysStoppedAnimation(over ? const Color(0xFFFDE047) : Colors.white),
+              valueColor: AlwaysStoppedAnimation(
+                  over ? const Color(0xFFFDE047) : Colors.white),
             ),
           ),
           Column(
@@ -678,13 +816,7 @@ class _BudgetCard extends ConsumerWidget {
   final BudgetStatus b;
   final String currency;
   final int index;
-  final DateTime month;
-  const _BudgetCard({
-    required this.b,
-    required this.currency,
-    required this.index,
-    required this.month,
-  });
+  const _BudgetCard({required this.b, required this.currency, required this.index});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -753,7 +885,8 @@ class _BudgetCard extends ConsumerWidget {
                                   fontWeight: FontWeight.w700, fontSize: 15)),
                           const SizedBox(height: 3),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
                               color: barColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(20),
@@ -769,10 +902,13 @@ class _BudgetCard extends ConsumerWidget {
                     ),
                     Text('$pct%',
                         style: TextStyle(
-                            color: barColor, fontWeight: FontWeight.w800, fontSize: 18)),
+                            color: barColor,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18)),
                     const SizedBox(width: 2),
                     PopupMenuButton<String>(
-                      icon: Icon(Icons.more_vert_rounded, color: context.muted, size: 20),
+                      icon: Icon(Icons.more_vert_rounded,
+                          color: context.muted, size: 20),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 40),
                       onSelected: (v) async {
@@ -794,7 +930,8 @@ class _BudgetCard extends ConsumerWidget {
                         PopupMenuItem(
                             value: 'delete', child: Text(t.budgetDeleteThisMonth)),
                         PopupMenuItem(
-                            value: 'delete-series', child: Text(t.budgetDeleteSeries)),
+                            value: 'delete-series',
+                            child: Text(t.budgetDeleteSeries)),
                       ],
                     ),
                   ],

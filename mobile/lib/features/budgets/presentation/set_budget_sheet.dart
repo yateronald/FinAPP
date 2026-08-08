@@ -446,15 +446,19 @@ class _RepeatChip extends StatelessWidget {
           height: 40,
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              color: selected ? Colors.white : context.colors.onSurface,
+          // Scales down rather than spilling past the chip, whatever the
+          // translation turns the label into.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : context.colors.onSurface,
+              ),
             ),
           ),
         ),

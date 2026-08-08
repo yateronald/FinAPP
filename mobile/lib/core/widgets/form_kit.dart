@@ -61,45 +61,60 @@ class FormSheetShell extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-      child: Container(
-        height: media.size.height * 0.93,
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              // A whisper of the accent at the top, fading into the page.
-              Color.alphaBlend(
-                  accent.withValues(alpha: isDark ? 0.10 : 0.055), context.colors.surface),
-              isDark ? AppColors.darkBg : AppColors.lightBg,
-            ],
-            stops: const [0, 0.42],
-          ),
-        ),
-        child: Column(
-          children: [
-            _ShellTopBar(
-              accent: accent,
-              progress: progress,
-              onClose: onClose ?? () => Navigator.pop(context),
+      // Height follows the content up to a ceiling, instead of always taking
+      // 93% of the screen — a short form (income, budget) would otherwise end
+      // in a band of empty space above the action button.
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: media.size.height * 0.93),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                // A whisper of the accent at the top, fading into the page.
+                Color.alphaBlend(
+                  accent.withValues(alpha: isDark ? 0.10 : 0.055),
+                  context.colors.surface,
+                ),
+                isDark ? AppColors.darkBg : AppColors.lightBg,
+              ],
+              stops: const [0, 0.42],
             ),
-            Expanded(
-              child: Form(
-                key: formKey,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
-                  children: [
-                    _ShellHeader(
-                        accent: accent, title: title, subtitle: subtitle, icon: icon),
-                    const SizedBox(height: 22),
-                    ...children,
-                  ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ShellTopBar(
+                accent: accent,
+                progress: progress,
+                onClose: onClose ?? () => Navigator.pop(context),
+              ),
+              // Flexible + shrinkWrap: takes what the content needs, scrolls
+              // only once it would exceed the ceiling above.
+              Flexible(
+                child: Form(
+                  key: formKey,
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
+                    children: [
+                      _ShellHeader(
+                        accent: accent,
+                        title: title,
+                        subtitle: subtitle,
+                        icon: icon,
+                      ),
+                      const SizedBox(height: 22),
+                      ...children,
+                    ],
+                  ),
                 ),
               ),
-            ),
-            _ShellFooter(child: footer),
-          ],
+              _ShellFooter(child: footer),
+            ],
+          ),
         ),
       ),
     );
@@ -107,7 +122,11 @@ class FormSheetShell extends StatelessWidget {
 }
 
 class _ShellTopBar extends StatelessWidget {
-  const _ShellTopBar({required this.accent, required this.progress, required this.onClose});
+  const _ShellTopBar({
+    required this.accent,
+    required this.progress,
+    required this.onClose,
+  });
   final Color accent;
   final double? progress;
   final VoidCallback onClose;
@@ -254,7 +273,11 @@ class _ShellHeader extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   subtitle!,
-                  style: TextStyle(fontSize: 13, height: 1.4, color: context.muted),
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: context.muted,
+                  ),
                 ),
               ],
             ],
@@ -309,7 +332,10 @@ class FormHeaderGlyph extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color.alphaBlend(Colors.white.withValues(alpha: 0.28), accent),
+                      Color.alphaBlend(
+                        Colors.white.withValues(alpha: 0.28),
+                        accent,
+                      ),
                       accent,
                     ],
                   ),
@@ -337,12 +363,26 @@ class FormHeaderGlyph extends StatelessWidget {
                 color: AppColors.success,
                 border: Border.all(color: context.colors.surface, width: 2.5),
               ),
-              child: const Icon(Icons.check_rounded, size: 13, color: Colors.white),
+              child: const Icon(
+                Icons.check_rounded,
+                size: 13,
+                color: Colors.white,
+              ),
             ),
           ),
           _Spark(right: 4, top: 4, size: 9, color: AppColors.warning),
-          _Spark(right: 74, top: 30, size: 7, color: accent.withValues(alpha: 0.55)),
-          _Spark(right: 62, top: 8, size: 5, color: accent.withValues(alpha: 0.35)),
+          _Spark(
+            right: 74,
+            top: 30,
+            size: 7,
+            color: accent.withValues(alpha: 0.55),
+          ),
+          _Spark(
+            right: 62,
+            top: 8,
+            size: 5,
+            color: accent.withValues(alpha: 0.35),
+          ),
         ],
       ),
     );
@@ -378,7 +418,12 @@ class _ShellFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(18, 12, 18, 14 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(
+        18,
+        12,
+        18,
+        14 + MediaQuery.of(context).padding.bottom,
+      ),
       decoration: BoxDecoration(
         color: context.isDark ? AppColors.darkBg : AppColors.lightBg,
         boxShadow: [
@@ -429,8 +474,8 @@ class FormCard extends StatelessWidget {
     final borderColor = hasError
         ? AppColors.danger
         : focused
-            ? accent.withValues(alpha: 0.55)
-            : Colors.transparent;
+        ? accent.withValues(alpha: 0.55)
+        : Colors.transparent;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: FormKit.cardGap),
@@ -456,7 +501,10 @@ class FormCard extends StatelessWidget {
                     _IconTile(icon: icon, accent: accent, hasError: hasError),
                     const SizedBox(width: 13),
                     Expanded(child: child),
-                    if (trailing != null) ...[const SizedBox(width: 6), trailing!],
+                    if (trailing != null) ...[
+                      const SizedBox(width: 6),
+                      trailing!,
+                    ],
                   ],
                 ),
                 if (errorText != null) ...[
@@ -464,14 +512,20 @@ class FormCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.error_outline_rounded,
-                          size: 14, color: AppColors.danger),
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        size: 14,
+                        color: AppColors.danger,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           errorText!,
                           style: const TextStyle(
-                              fontSize: 11.5, height: 1.35, color: AppColors.danger),
+                            fontSize: 11.5,
+                            height: 1.35,
+                            color: AppColors.danger,
+                          ),
                         ),
                       ),
                     ],
@@ -488,7 +542,11 @@ class FormCard extends StatelessWidget {
 }
 
 class _IconTile extends StatelessWidget {
-  const _IconTile({required this.icon, required this.accent, required this.hasError});
+  const _IconTile({
+    required this.icon,
+    required this.accent,
+    required this.hasError,
+  });
   final IconData icon;
   final Color accent;
   final bool hasError;
@@ -524,15 +582,24 @@ class _FieldLabel extends StatelessWidget {
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, height: 1.2),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+            ),
           ),
         ),
         if (required)
           Padding(
             padding: const EdgeInsets.only(left: 3),
-            child: Text('*',
-                style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: accent)),
+            child: Text(
+              '*',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: accent,
+              ),
+            ),
           ),
       ],
     );
@@ -624,15 +691,20 @@ class _FormTextCardState extends State<FormTextCard> {
               ? null
               : Align(
                   alignment: Alignment.centerRight,
-                  child: Text(count,
-                      style: TextStyle(fontSize: 11, color: context.muted)),
+                  child: Text(
+                    count,
+                    style: TextStyle(fontSize: 11, color: context.muted),
+                  ),
                 ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _FieldLabel(widget.label,
-                  required: widget.required, accent: widget.accent),
+              _FieldLabel(
+                widget.label,
+                required: widget.required,
+                accent: widget.accent,
+              ),
               const SizedBox(height: 2),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -648,12 +720,19 @@ class _FormTextCardState extends State<FormTextCard> {
                       maxLines: widget.maxLines,
                       maxLength: widget.maxLength,
                       cursorColor: widget.accent,
-                      style: widget.textStyle ??
-                          const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style:
+                          widget.textStyle ??
+                          const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                       decoration: InputDecoration(
                         hintText: widget.hint,
                         hintStyle: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w500, color: context.muted),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: context.muted,
+                        ),
                         isDense: true,
                         filled: false,
                         counterText: '',
@@ -676,7 +755,10 @@ class _FormTextCardState extends State<FormTextCard> {
                     Text(
                       widget.suffix!,
                       style: TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700, color: context.muted),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: context.muted,
+                      ),
                     ),
                   ],
                 ],
@@ -758,16 +840,29 @@ class FormPickerCard extends StatelessWidget {
               customBorder: const CircleBorder(),
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: Icon(Icons.close_rounded, size: 16, color: context.muted),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: context.muted,
+                ),
               ),
             ),
-          Icon(Icons.chevron_right_rounded,
-              size: 22, color: context.muted.withValues(alpha: 0.7)),
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 22,
+            color: context.muted.withValues(alpha: 0.7),
+          ),
         ],
       ),
       child: leading == null
           ? row
-          : Row(children: [leading!, const SizedBox(width: 10), Expanded(child: row)]),
+          : Row(
+              children: [
+                leading!,
+                const SizedBox(width: 10),
+                Expanded(child: row),
+              ],
+            ),
     );
   }
 }
@@ -809,10 +904,15 @@ class FormCompactPicker extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 9),
                 Row(
                   children: [
@@ -825,8 +925,12 @@ class FormCompactPicker extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: placeholder ? FontWeight.w500 : FontWeight.w700,
-                          color: placeholder ? context.muted : context.colors.onSurface,
+                          fontWeight: placeholder
+                              ? FontWeight.w500
+                              : FontWeight.w700,
+                          color: placeholder
+                              ? context.muted
+                              : context.colors.onSurface,
                         ),
                       ),
                     ),
@@ -836,13 +940,19 @@ class FormCompactPicker extends StatelessWidget {
                         customBorder: const CircleBorder(),
                         child: Padding(
                           padding: const EdgeInsets.all(3),
-                          child:
-                              Icon(Icons.close_rounded, size: 15, color: context.muted),
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 15,
+                            color: context.muted,
+                          ),
                         ),
                       )
                     else
-                      Icon(Icons.chevron_right_rounded,
-                          size: 19, color: context.muted.withValues(alpha: 0.7)),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 19,
+                        color: context.muted.withValues(alpha: 0.7),
+                      ),
                   ],
                 ),
               ],
@@ -911,18 +1021,29 @@ class FormErrorLine extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
         decoration: BoxDecoration(
-          color: AppColors.danger.withValues(alpha: context.isDark ? 0.18 : 0.09),
+          color: AppColors.danger.withValues(
+            alpha: context.isDark ? 0.18 : 0.09,
+          ),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 17, color: AppColors.danger),
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 17,
+              color: AppColors.danger,
+            ),
             const SizedBox(width: 9),
             Expanded(
-              child: Text(message,
-                  style: const TextStyle(
-                      fontSize: 12.5, height: 1.35, color: AppColors.danger)),
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  color: AppColors.danger,
+                ),
+              ),
             ),
           ],
         ),
@@ -964,7 +1085,10 @@ class FormPrimaryButton extends StatelessWidget {
             end: Alignment.centerRight,
             colors: [
               accent,
-              Color.alphaBlend(AppColors.accent.withValues(alpha: 0.45), accent),
+              Color.alphaBlend(
+                AppColors.accent.withValues(alpha: 0.45),
+                accent,
+              ),
             ],
           ),
           boxShadow: enabled
@@ -988,7 +1112,9 @@ class FormPrimaryButton extends StatelessWidget {
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2.4, color: Colors.white),
+                        strokeWidth: 2.4,
+                        color: Colors.white,
+                      ),
                     )
                   : Row(
                       mainAxisSize: MainAxisSize.min,
