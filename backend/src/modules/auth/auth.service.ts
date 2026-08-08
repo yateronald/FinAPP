@@ -81,6 +81,9 @@ export class AuthService {
               language: dto.language ?? Language.EN,
               currency:
                 dto.currency ?? this.config.get<string>('defaultCurrency') ?? 'XOF',
+              // AI is always opt-in. Enabling it requires the dedicated
+              // disclosure and consent endpoint after the first welcome.
+              aiEnabled: false,
             },
           },
           categories: {
@@ -337,7 +340,10 @@ export class AuthService {
           termsVersion: TERMS_VERSION,
           privacyVersion: PRIVACY_VERSION,
           settings: {
-            create: { currency: this.config.get<string>('defaultCurrency') ?? 'XOF' },
+            create: {
+              currency: this.config.get<string>('defaultCurrency') ?? 'XOF',
+              aiEnabled: false,
+            },
           },
           categories: {
             create: ALL_DEFAULT_CATEGORIES.map((c, index) => ({

@@ -6,6 +6,7 @@ import '../../core/offline/sync_engine.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
+import '../ai/presentation/ai_access.dart';
 import '../ai/presentation/ai_screen.dart';
 import '../auth/presentation/biometric_prompt.dart';
 import '../auth/presentation/terms_acceptance_gate.dart';
@@ -49,6 +50,11 @@ class _MainShellState extends ConsumerState<MainShell> {
     if (!mounted) return;
 
     final wantsToAdd = await maybeShowWelcome(context, ref);
+    if (!mounted) return;
+
+    // AI is optional and off by default. The disclosure follows the welcome,
+    // before any AI surface can be used.
+    await maybePromptAiConsent(context, ref);
 
     if (wantsToAdd && mounted) {
       // Honour the CTA: land them straight on the expense form.
@@ -59,12 +65,12 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   String _title(AppText t, int index) => [
-        t.titleHome,
-        t.titleFinances,
-        t.titleBudgets,
-        t.titleAi,
-        t.titleLoans,
-      ][index];
+    t.titleHome,
+    t.titleFinances,
+    t.titleBudgets,
+    t.titleAi,
+    t.titleLoans,
+  ][index];
 
   Widget _body(int index) {
     switch (index) {
@@ -95,7 +101,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     final user = ref.watch(authProvider).user;
     // Start the offline sync engine and refresh data whenever a flush completes.
     ref.watch(syncEngineProvider);
-    ref.listen(syncTickProvider, (_, __) {
+    ref.listen(syncTickProvider, (_, _) {
       ref.invalidate(dashboardProvider);
       ref.invalidate(transactionsProvider(TxType.income));
       ref.invalidate(transactionsProvider(TxType.expense));
@@ -109,8 +115,10 @@ class _MainShellState extends ConsumerState<MainShell> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 20,
-        title: Text(_title(context.t, index),
-            style: const TextStyle(fontWeight: FontWeight.w800)),
+        title: Text(
+          _title(context.t, index),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
         actions: [
           _NotificationBell(),
           Padding(
@@ -123,7 +131,10 @@ class _MainShellState extends ConsumerState<MainShell> {
                 child: Text(
                   user?.initials ?? '?',
                   style: const TextStyle(
-                      color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 13),
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
@@ -139,10 +150,13 @@ class _MainShellState extends ConsumerState<MainShell> {
                     children: [
                       _SideRail(
                         index: index,
-                        onTap: (i) => ref.read(shellIndexProvider.notifier).set(i),
+                        onTap: (i) =>
+                            ref.read(shellIndexProvider.notifier).set(i),
                         onAdd: _openAddSheet,
                         onReports: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ReportsScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const ReportsScreen(),
+                          ),
                         ),
                       ),
                       const VerticalDivider(width: 1, thickness: 1),
@@ -162,9 +176,9 @@ class _MainShellState extends ConsumerState<MainShell> {
               index: index,
               onTap: (i) => ref.read(shellIndexProvider.notifier).set(i),
               onAdd: _openAddSheet,
-              onReports: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ReportsScreen()),
-              ),
+              onReports: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const ReportsScreen())),
             ),
     );
   }
@@ -193,12 +207,18 @@ class _NotificationBell extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.all(4),
               constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-              decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle),
+              decoration: const BoxDecoration(
+                color: AppColors.danger,
+                shape: BoxShape.circle,
+              ),
               child: Text(
                 unread > 9 ? '9+' : '$unread',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                    color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ),
@@ -219,7 +239,9 @@ class _SyncBanner extends StatelessWidget {
     final color = offline ? AppColors.warning : AppColors.info;
     final icon = offline ? Icons.cloud_off_rounded : Icons.sync_rounded;
     final text = offline
-        ? (pending > 0 ? context.t.offlinePending(pending) : context.t.offlineNoPending)
+        ? (pending > 0
+              ? context.t.offlinePending(pending)
+              : context.t.offlineNoPending)
         : context.t.syncing(pending);
     return Container(
       width: double.infinity,
@@ -231,8 +253,14 @@ class _SyncBanner extends StatelessWidget {
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 8),
           Flexible(
-            child: Text(text,
-                style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w600)),
+            child: Text(
+              text,
+              style: TextStyle(
+                color: color,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -266,12 +294,21 @@ class _SideRail extends StatelessWidget {
       labelType: NavigationRailLabelType.all,
       backgroundColor: context.colors.surface,
       indicatorColor: AppColors.primary.withValues(alpha: 0.12),
-      selectedIconTheme: const IconThemeData(color: AppColors.primary, size: 24),
+      selectedIconTheme: const IconThemeData(
+        color: AppColors.primary,
+        size: 24,
+      ),
       unselectedIconTheme: IconThemeData(color: context.muted, size: 23),
-      selectedLabelTextStyle:
-          const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 12),
-      unselectedLabelTextStyle:
-          TextStyle(color: context.muted, fontWeight: FontWeight.w600, fontSize: 12),
+      selectedLabelTextStyle: const TextStyle(
+        color: AppColors.primary,
+        fontWeight: FontWeight.w700,
+        fontSize: 12,
+      ),
+      unselectedLabelTextStyle: TextStyle(
+        color: context.muted,
+        fontWeight: FontWeight.w600,
+        fontSize: 12,
+      ),
       leading: Padding(
         padding: const EdgeInsets.only(top: 8, bottom: 12),
         child: FloatingActionButton(
@@ -335,18 +372,24 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
+    final compact = context.useCompactLayout;
     final bottomInset = MediaQuery.of(context).padding.bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(14, 0, 14, 10 + bottomInset * 0.4),
+      padding: EdgeInsets.fromLTRB(
+        compact ? 8 : 14,
+        0,
+        compact ? 8 : 14,
+        10 + bottomInset * 0.4,
+      ),
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.topCenter,
         children: [
           Container(
-            height: 66,
+            height: compact ? 62 : 66,
             decoration: BoxDecoration(
               color: context.colors.surface,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(compact ? 22 : 24),
               border: Border.all(color: context.borderColor),
               boxShadow: [
                 BoxShadow(
@@ -357,54 +400,136 @@ class _BottomBar extends StatelessWidget {
               ],
             ),
             child: Row(
-              children: [
-                _item(context, 0, Icons.home_rounded, Icons.home_outlined, t.navHome),
-                _item(context, 1, Icons.swap_vert_rounded, Icons.swap_vert_rounded, t.navFinances),
-                _item(context, 2, Icons.savings_rounded, Icons.savings_outlined, t.navBudgets),
-                _item(context, 4, Icons.account_balance_rounded,
-                    Icons.account_balance_outlined, t.navLoans),
-                _action(context, Icons.bar_chart_rounded, t.reports, onReports),
-                _item(context, 3, Icons.auto_awesome_rounded, Icons.auto_awesome_outlined,
-                    t.navAiShort),
-                // Reserved space so the floating add button never covers a tab.
-                const SizedBox(width: 62),
-              ],
+              children: compact
+                  ? [
+                      _item(
+                        context,
+                        0,
+                        Icons.home_rounded,
+                        Icons.home_outlined,
+                        t.navHome,
+                        compact: true,
+                      ),
+                      _item(
+                        context,
+                        1,
+                        Icons.swap_vert_rounded,
+                        Icons.swap_vert_rounded,
+                        t.navFinances,
+                        compact: true,
+                      ),
+                      _item(
+                        context,
+                        2,
+                        Icons.savings_rounded,
+                        Icons.savings_outlined,
+                        t.navBudgets,
+                        compact: true,
+                      ),
+                      _item(
+                        context,
+                        3,
+                        Icons.auto_awesome_rounded,
+                        Icons.auto_awesome_outlined,
+                        t.navAiShort,
+                        compact: true,
+                      ),
+                      _more(context, t.navMore),
+                      const SizedBox(width: 54),
+                    ]
+                  : [
+                      _item(
+                        context,
+                        0,
+                        Icons.home_rounded,
+                        Icons.home_outlined,
+                        t.navHome,
+                      ),
+                      _item(
+                        context,
+                        1,
+                        Icons.swap_vert_rounded,
+                        Icons.swap_vert_rounded,
+                        t.navFinances,
+                      ),
+                      _item(
+                        context,
+                        2,
+                        Icons.savings_rounded,
+                        Icons.savings_outlined,
+                        t.navBudgets,
+                      ),
+                      _item(
+                        context,
+                        4,
+                        Icons.account_balance_rounded,
+                        Icons.account_balance_outlined,
+                        t.navLoans,
+                      ),
+                      _action(
+                        context,
+                        Icons.bar_chart_rounded,
+                        t.reports,
+                        onReports,
+                      ),
+                      _item(
+                        context,
+                        3,
+                        Icons.auto_awesome_rounded,
+                        Icons.auto_awesome_outlined,
+                        t.navAiShort,
+                      ),
+                      // Reserved space so the floating add button never covers a tab.
+                      const SizedBox(width: 62),
+                    ],
             ),
           ),
           // Prominent gradient add button, lifted above the bar on the right.
           // Hidden on the AI tab, where it would sit over the chat send button.
           if (index != 3)
-          Positioned(
-            top: -22,
-            right: 4,
-            child: GestureDetector(
-              onTap: onAdd,
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: AppColors.brandGradient,
-                  borderRadius: BorderRadius.circular(19),
-                  border: Border.all(color: context.colors.surface, width: 3.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.45),
-                      blurRadius: 18,
-                      offset: const Offset(0, 7),
+            Positioned(
+              top: compact ? -18 : -22,
+              right: 4,
+              child: GestureDetector(
+                onTap: onAdd,
+                child: Container(
+                  width: compact ? 50 : 56,
+                  height: compact ? 50 : 56,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.brandGradient,
+                    borderRadius: BorderRadius.circular(compact ? 17 : 19),
+                    border: Border.all(
+                      color: context.colors.surface,
+                      width: compact ? 3 : 3.5,
                     ),
-                  ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.45),
+                        blurRadius: 18,
+                        offset: const Offset(0, 7),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: Colors.white,
+                    size: compact ? 26 : 28,
+                  ),
                 ),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
               ),
             ),
-          ),
         ],
       ),
     );
   }
 
   /// A bar entry that opens a pushed screen (Reports) rather than a shell tab.
-  Widget _action(BuildContext context, IconData icon, String label, VoidCallback onTap) {
+  Widget _action(
+    BuildContext context,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
     final color = context.muted;
     return Expanded(
       child: InkWell(
@@ -419,17 +544,111 @@ class _BottomBar extends StatelessWidget {
               child: Icon(icon, color: color, size: 21),
             ),
             const SizedBox(height: 2),
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _item(BuildContext context, int i, IconData active, IconData inactive, String label) {
+  Widget _more(BuildContext context, String label) {
+    final selected = index == 4;
+    final color = selected ? AppColors.primary : context.muted;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _showMoreSheet(context),
+        borderRadius: BorderRadius.circular(18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.12)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.more_horiz_rounded, color: color, size: 20),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMoreSheet(BuildContext context) {
+    final t = context.t;
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.account_balance_outlined),
+              title: Text(t.navLoans),
+              trailing: index == 4
+                  ? const Icon(Icons.check_rounded, color: AppColors.primary)
+                  : null,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                onTap(4);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.bar_chart_rounded),
+              title: Text(t.reports),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                onReports();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _item(
+    BuildContext context,
+    int i,
+    IconData active,
+    IconData inactive,
+    String label, {
+    bool compact = false,
+  }) {
     final selected = index == i;
     final color = selected ? AppColors.primary : context.muted;
     return Expanded(
@@ -442,21 +661,33 @@ class _BottomBar extends StatelessWidget {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 6 : 8,
+                vertical: 4,
+              ),
               decoration: BoxDecoration(
-                color: selected ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent,
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.12)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(selected ? active : inactive, color: color, size: 21),
+              child: Icon(
+                selected ? active : inactive,
+                color: color,
+                size: compact ? 20 : 21,
+              ),
             ),
             const SizedBox(height: 2),
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: color,
-                    fontSize: 10,
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600)),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -475,7 +706,12 @@ class _AddActionSheet extends StatelessWidget {
         color: context.colors.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
       ),
-      padding: EdgeInsets.fromLTRB(18, 10, 18, 18 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(
+        18,
+        10,
+        18,
+        18 + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -505,17 +741,28 @@ class _AddActionSheet extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 23),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 23,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(t.add,
-                        style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-                    Text(t.addSheetSubtitle,
-                        style: TextStyle(color: context.muted, fontSize: 12.5)),
+                    Text(
+                      t.add,
+                      style: const TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      t.addSheetSubtitle,
+                      style: TextStyle(color: context.muted, fontSize: 12.5),
+                    ),
                   ],
                 ),
               ),
@@ -528,7 +775,11 @@ class _AddActionSheet extends StatelessWidget {
                     color: context.surfaceAlt,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.close_rounded, size: 18, color: context.muted),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: context.muted,
+                  ),
                 ),
               ),
             ],
@@ -621,13 +872,20 @@ class _AddActionSheet extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title,
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(sub,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: context.muted, fontSize: 12.5)),
+                      Text(
+                        sub,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: context.muted, fontSize: 12.5),
+                      ),
                     ],
                   ),
                 ),
@@ -637,7 +895,11 @@ class _AddActionSheet extends StatelessWidget {
                     color: color.withValues(alpha: 0.14),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.arrow_forward_rounded, color: color, size: 15),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: color,
+                    size: 15,
+                  ),
                 ),
               ],
             ),

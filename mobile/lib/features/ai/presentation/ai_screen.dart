@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../providers/ai_providers.dart';
 import 'chat_panel.dart';
 import 'forecast_panel.dart';
+import 'ai_access.dart';
 
 class AiScreen extends ConsumerStatefulWidget {
   const AiScreen({super.key});
@@ -18,6 +19,10 @@ class _AiScreenState extends ConsumerState<AiScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Return before watching chat/forecast providers. Opening the AI tab while
+    // disabled therefore makes no AI request.
+    if (!isAiEnabled(ref)) return const AiDisabledState();
+
     return Column(
       children: [
         Padding(
@@ -33,7 +38,11 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                   ),
                   child: Row(
                     children: [
-                      _seg(context.t.aiAssistant, 0, Icons.auto_awesome_rounded),
+                      _seg(
+                        context.t.aiAssistant,
+                        0,
+                        Icons.auto_awesome_rounded,
+                      ),
                       _seg(context.t.aiForecast, 1, Icons.show_chart_rounded),
                     ],
                   ),
@@ -71,13 +80,22 @@ class _AiScreenState extends ConsumerState<AiScreen> {
             color: sel ? context.colors.surface : Colors.transparent,
             borderRadius: BorderRadius.circular(11),
             boxShadow: sel
-                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 6)]
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 6,
+                    ),
+                  ]
                 : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: sel ? AppColors.primary : context.muted),
+              Icon(
+                icon,
+                size: 16,
+                color: sel ? AppColors.primary : context.muted,
+              ),
               const SizedBox(width: 6),
               Text(
                 label,

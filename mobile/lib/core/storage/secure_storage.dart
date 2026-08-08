@@ -6,7 +6,6 @@ class SecureStorage {
   static final instance = SecureStorage._();
 
   final _storage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 
@@ -15,6 +14,7 @@ class SecureStorage {
   static const _kBiometric = 'ft_biometric_enabled';
   static const _kBiometricAsked = 'ft_biometric_prompted';
   static const _kWelcomeShown = 'ft_welcome_shown';
+  static const _kAiConsentPrompted = 'ft_ai_consent_prompted_';
 
   Future<void> saveTokens({required String access, String? refresh}) async {
     await _storage.write(key: _kAccess, value: access);
@@ -39,9 +39,17 @@ class SecureStorage {
   /// The welcome sheet is a one-time greeting. The server tells us it is the
   /// first sign-in, but that flag would fire again on a reinstall, so we also
   /// record it locally.
-  Future<void> markWelcomeShown() => _storage.write(key: _kWelcomeShown, value: '1');
+  Future<void> markWelcomeShown() =>
+      _storage.write(key: _kWelcomeShown, value: '1');
   Future<bool> get welcomeShown async =>
       (await _storage.read(key: _kWelcomeShown)) == '1';
+
+  /// The optional AI disclosure is offered once per account on this device.
+  /// A per-user key prevents one account's choice from hiding it for another.
+  Future<void> markAiConsentPrompted(String userId) =>
+      _storage.write(key: '$_kAiConsentPrompted$userId', value: '1');
+  Future<bool> aiConsentPrompted(String userId) async =>
+      (await _storage.read(key: '$_kAiConsentPrompted$userId')) == '1';
 
   Future<void> clear() async {
     await _storage.delete(key: _kAccess);

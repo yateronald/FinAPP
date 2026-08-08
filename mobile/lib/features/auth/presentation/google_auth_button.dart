@@ -4,9 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/i18n/app_text.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
 import '../data/google_auth_service.dart';
 import '../providers/auth_provider.dart';
+import 'auth_widgets.dart';
 
 /// "Continue with Google" / "Sign up with Google".
 ///
@@ -44,10 +44,9 @@ class _GoogleAuthButtonState extends ConsumerState<GoogleAuthButton> {
       // Null = user dismissed the picker. Not an error; say nothing.
       if (identity == null) return;
 
-      final user = await ref.read(authRepositoryProvider).googleAuth(
-            idToken: identity.idToken,
-            intent: widget.intent,
-          );
+      final user = await ref
+          .read(authRepositoryProvider)
+          .googleAuth(idToken: identity.idToken, intent: widget.intent);
       if (!mounted) return;
       ref.read(authProvider.notifier).setUser(user);
       context.go('/home');
@@ -107,9 +106,14 @@ class _GoogleAuthButtonState extends ConsumerState<GoogleAuthButton> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(title,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-        content: Text(body, style: const TextStyle(fontSize: 13.5, height: 1.45)),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+        ),
+        content: Text(
+          body,
+          style: const TextStyle(fontSize: 13.5, height: 1.45),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -128,37 +132,12 @@ class _GoogleAuthButtonState extends ConsumerState<GoogleAuthButton> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    return SizedBox(
-      height: 52,
-      child: OutlinedButton(
-        onPressed: _loading ? null : _run,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: context.borderColor),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          backgroundColor: context.colors.surface,
-        ),
-        child: _loading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2.2),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const _GoogleGlyph(),
-                  const SizedBox(width: 12),
-                  Text(
-                    _isSignUp ? t.signUpWithGoogle : t.continueWithGoogle,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-      ),
+    return AuthMethodButton(
+      leading: const _GoogleGlyph(),
+      label: _isSignUp ? t.signUpWithGoogle : t.continueWithGoogle,
+      subtitle: _isSignUp ? t.signUpWithGoogleBody : t.signInWithGoogleBody,
+      loading: _loading,
+      onTap: _run,
     );
   }
 }
@@ -189,7 +168,13 @@ class _GooglePainter extends CustomPainter {
       ..strokeCap = StrokeCap.butt;
 
     // Four arcs approximating the Google mark.
-    canvas.drawArc(rect, -0.35, 1.15, false, p..color = const Color(0xFF4285F4));
+    canvas.drawArc(
+      rect,
+      -0.35,
+      1.15,
+      false,
+      p..color = const Color(0xFF4285F4),
+    );
     canvas.drawArc(rect, 0.85, 1.35, false, p..color = const Color(0xFF34A853));
     canvas.drawArc(rect, 2.25, 1.35, false, p..color = const Color(0xFFFBBC05));
     canvas.drawArc(rect, 3.65, 1.5, false, p..color = const Color(0xFFEA4335));

@@ -23,6 +23,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscure = true;
   bool _remember = true;
   bool _loading = false;
+  bool _showCredentialForm = false;
 
   @override
   void dispose() {
@@ -36,7 +37,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
     try {
-      await ref.read(authProvider.notifier).login(_email.text.trim(), _password.text);
+      await ref
+          .read(authProvider.notifier)
+          .login(_email.text.trim(), _password.text);
       if (mounted) context.go('/home');
     } catch (e) {
       // If auth actually succeeded (token stored, state authenticated) but a
@@ -47,7 +50,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e is ApiException ? e.message : context.t.signInFailed),
+            content: Text(
+              e is ApiException ? e.message : context.t.signInFailed,
+            ),
             backgroundColor: AppColors.danger,
           ),
         );
@@ -76,7 +81,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.t.cancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.t.cancel),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
             child: Text(context.t.send),
@@ -89,9 +97,214 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref.read(authRepositoryProvider).forgotPassword(email);
     } catch (_) {}
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(context.t.forgotSent)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.t.forgotSent)));
     }
+  }
+
+  Widget _methodChoice(AppText t) {
+    return Column(
+      key: const ValueKey('login-method-choice'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          t.loginWelcome,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 21,
+            fontWeight: FontWeight.w800,
+            height: 1.2,
+            letterSpacing: -0.4,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          t.loginSubtitle,
+          textAlign: TextAlign.center,
+          style: TextStyle(color: context.muted, fontSize: 12, height: 1.4),
+        ),
+        const SizedBox(height: 24),
+        AuthMethodButton(
+          emphasized: true,
+          leading: const Icon(
+            Icons.mail_rounded,
+            color: Colors.white,
+            size: 22,
+          ),
+          label: t.signInWithEmail,
+          subtitle: t.signInWithEmailBody,
+          onTap: () => setState(() => _showCredentialForm = true),
+        ),
+        const SizedBox(height: 16),
+        AuthMethodDivider(label: t.orSeparator),
+        const SizedBox(height: 16),
+        const GoogleAuthButton(intent: 'signin'),
+        const SizedBox(height: 18),
+        AuthSecurityBanner(title: t.authSecurityTitle, body: t.bankGrade),
+        const SizedBox(height: 10),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(t.noAccount, style: TextStyle(color: context.muted)),
+            TextButton(
+              onPressed: () => context.push('/register'),
+              child: Text(t.createAccount),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _credentialForm(AppText t) {
+    return Column(
+      key: const ValueKey('login-credential-form'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            IconButton.filledTonal(
+              onPressed: _loading
+                  ? null
+                  : () => setState(() => _showCredentialForm = false),
+              icon: const Icon(Icons.arrow_back_rounded, size: 19),
+              tooltip: t.backToSignInOptions,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.signInWithEmail,
+                    style: const TextStyle(
+                      fontSize: 18.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    t.signInWithEmailBody,
+                    style: TextStyle(color: context.muted, fontSize: 12.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 22),
+        AuthLabel(t.emailAddress),
+        TextFormField(
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.email],
+          decoration: authDecoration(
+            context,
+            hint: t.emailHint,
+            icon: Icons.mail_outline_rounded,
+          ),
+          validator: (v) =>
+              (v == null || !v.contains('@')) ? t.emailInvalid : null,
+        ),
+        const SizedBox(height: 14),
+        AuthLabel(t.password),
+        TextFormField(
+          controller: _password,
+          obscureText: _obscure,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.password],
+          onFieldSubmitted: (_) => _submit(),
+          decoration: authDecoration(
+            context,
+            hint: t.passwordHint,
+            icon: Icons.lock_outline_rounded,
+            suffix: IconButton(
+              icon: Icon(
+                _obscure
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                color: context.muted,
+              ),
+              onPressed: () => setState(() => _obscure = !_obscure),
+            ),
+          ),
+          validator: (v) => (v == null || v.isEmpty) ? t.required : null,
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 10,
+          runSpacing: 2,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 22,
+                  width: 22,
+                  child: Checkbox(
+                    value: _remember,
+                    onChanged: (v) => setState(() => _remember = v ?? true),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    activeColor: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  t.rememberMe,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            TextButton(
+              onPressed: _forgotPassword,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              ),
+              child: Text(
+                t.forgotPassword,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        AuthPrimaryButton(label: t.signIn, loading: _loading, onTap: _submit),
+        const SizedBox(height: 10),
+        TextButton.icon(
+          onPressed: _loading
+              ? null
+              : () => setState(() => _showCredentialForm = false),
+          icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+          label: Text(t.backToSignInOptions),
+        ),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(t.noAccount, style: TextStyle(color: context.muted)),
+            TextButton(
+              onPressed: () => context.push('/register'),
+              child: Text(t.createAccount),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   @override
@@ -99,235 +312,136 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final t = context.t;
     final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     return Scaffold(
-      backgroundColor: context.isDark ? context.colors.surface : const Color(0xFFEFEEFB),
-      body: Column(
-        children: [
-          if (!keyboardOpen)
-            SafeArea(
-              bottom: false,
-              child: AuthHero(
-                height: 240,
-                left: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
+      backgroundColor: Colors.transparent,
+      body: AuthBackdrop(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: EdgeInsets.fromLTRB(16, keyboardOpen ? 22 : 18, 16, 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const AuthBrand(logoSize: 46, showText: false),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Fynexa',
-                      style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                          color: context.colors.onSurface),
-                    ),
-                    const SizedBox(height: 5),
-                    SizedBox(
-                      width: 180,
-                      child: Text(t.appTagline,
-                          style: TextStyle(color: context.muted, fontSize: 12.5, height: 1.25)),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        _feature(context, Icons.verified_user_rounded, t.featSecure),
-                        const SizedBox(width: 16),
-                        _feature(context, Icons.lock_rounded, t.featConfidential),
-                        const SizedBox(width: 16),
-                        _feature(context, Icons.bolt_rounded, t.featSmart),
-                      ],
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(duration: 400.ms),
-            ),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: context.colors.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-              ),
-              child: SafeArea(
-                top: false,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
-                  // Keep the form a comfortable, centred width on tablets and
-                  // landscape instead of stretching it across the screen.
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 460),
-                      child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(
-                          child: Text(t.loginWelcome,
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-                        ),
-                        const SizedBox(height: 4),
-                        Center(
-                          child: Text(t.loginSubtitle,
-                              style: TextStyle(color: context.muted, fontSize: 13.5)),
-                        ),
-                        const SizedBox(height: 18),
-                        AuthLabel(t.emailAddress),
-                        TextFormField(
-                          controller: _email,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          decoration: authDecoration(context,
-                              hint: t.emailHint, icon: Icons.mail_outline_rounded),
-                          validator: (v) =>
-                              (v == null || !v.contains('@')) ? t.emailInvalid : null,
-                        ),
-                        const SizedBox(height: 14),
-                        AuthLabel(t.password),
-                        TextFormField(
-                          controller: _password,
-                          obscureText: _obscure,
-                          onFieldSubmitted: (_) => _submit(),
-                          decoration: authDecoration(
-                            context,
-                            hint: t.passwordHint,
-                            icon: Icons.lock_outline_rounded,
-                            suffix: IconButton(
-                              icon: Icon(
-                                  _obscure
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  color: context.muted),
-                              onPressed: () => setState(() => _obscure = !_obscure),
-                            ),
-                          ),
-                          validator: (v) => (v == null || v.isEmpty) ? t.required : null,
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
+                    if (!keyboardOpen) ...[
+                      AuthHero(
+                        height: 192,
+                        left: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: Checkbox(
-                                value: _remember,
-                                onChanged: (v) => setState(() => _remember = v ?? true),
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(6)),
-                                activeColor: AppColors.primary,
+                            const AuthBrand(logoSize: 42, showText: false),
+                            const SizedBox(height: 9),
+                            Text(
+                              'Fynexa',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Text(t.rememberMe,
-                                style:
-                                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                            const Spacer(),
-                            GestureDetector(
-                              onTap: _forgotPassword,
-                              child: Text(t.forgotPassword,
-                                  style: const TextStyle(
-                                      color: AppColors.primary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 5),
+                            Text(
+                              t.appTagline,
+                              style: TextStyle(
+                                color: context.muted,
+                                fontSize: 11.5,
+                                height: 1.3,
+                              ),
+                            ),
+                            const SizedBox(height: 13),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _heroFeature(
+                                    Icons.verified_user_rounded,
+                                    t.featSecure,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _heroFeature(
+                                    Icons.lock_rounded,
+                                    t.featConfidential,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _heroFeature(
+                                    Icons.bolt_rounded,
+                                    t.featSmart,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        AuthPrimaryButton(
-                          label: t.signIn,
-                          loading: _loading,
-                          onTap: _submit,
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(child: Divider(color: context.borderColor)),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(t.continueWith,
-                                  style: TextStyle(color: context.muted, fontSize: 12.5)),
+                      ).animate().fadeIn(duration: 350.ms),
+                      const SizedBox(height: 30),
+                    ],
+                    AuthPanel(
+                          icon: Icons.person_rounded,
+                          child: Form(
+                            key: _formKey,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 260),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: SlideTransition(
+                                      position: Tween<Offset>(
+                                        begin: const Offset(0.035, 0),
+                                        end: Offset.zero,
+                                      ).animate(animation),
+                                      child: child,
+                                    ),
+                                  ),
+                              child: _showCredentialForm
+                                  ? _credentialForm(t)
+                                  : _methodChoice(t),
                             ),
-                            Expanded(child: Divider(color: context.borderColor)),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        const GoogleAuthButton(intent: 'signin'),
-                        const SizedBox(height: 14),
-                        _SecurityBanner(text: t.bankGrade),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(t.noAccount, style: TextStyle(color: context.muted)),
-                            TextButton(
-                              onPressed: () => context.push('/register'),
-                              child: Text(t.createAccount),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                      ),
-                    ),
-                  ),
+                          ),
+                        )
+                        .animate()
+                        .fadeIn(delay: 100.ms, duration: 380.ms)
+                        .slideY(begin: 0.04, end: 0),
+                  ],
                 ),
               ),
-            ).animate().fadeIn(delay: 120.ms, duration: 400.ms).slideY(begin: 0.05, end: 0),
+            ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _feature(BuildContext context, IconData icon, String label) {
-    return Column(
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: context.colors.surface,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4)),
-            ],
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 18),
         ),
-        const SizedBox(height: 5),
-        Text(label, style: TextStyle(color: context.muted, fontSize: 11)),
-      ],
+      ),
     );
   }
-}
 
-class _SecurityBanner extends StatelessWidget {
-  final String text;
-  const _SecurityBanner({required this.text});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
+  Widget _heroFeature(IconData icon, String label) => Column(
+    children: [
+      Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: context.colors.surface.withValues(alpha: 0.92),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              blurRadius: 9,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Icon(icon, color: AppColors.primary, size: 16),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.shield_outlined, color: AppColors.primary, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(text,
-                style: TextStyle(color: context.muted, fontSize: 12.5, height: 1.35)),
-          ),
-          Icon(Icons.chevron_right_rounded, color: context.muted),
-        ],
+      const SizedBox(height: 5),
+      Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: context.muted, fontSize: 9.5),
       ),
-    );
-  }
+    ],
+  );
 }

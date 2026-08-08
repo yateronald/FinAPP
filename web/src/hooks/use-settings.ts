@@ -1,17 +1,19 @@
-'use client';
+"use client";
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, API_URL } from '@/lib/api';
-import { useAuthStore, type AuthUser } from '@/store/auth';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, API_URL } from "@/lib/api";
+import { useAuthStore, type AuthUser } from "@/store/auth";
 
 export interface UserSettings {
-  language: 'FR' | 'EN';
+  language: "FR" | "EN";
   currency: string;
-  theme: 'LIGHT' | 'DARK' | 'SYSTEM';
+  theme: "LIGHT" | "DARK" | "SYSTEM";
   notificationsEnabled: boolean;
   emailNotifications: boolean;
   aiEnabled: boolean;
-  aiProvider: 'GEMINI' | 'AGENTROUTER';
+  aiConsentAt: string | null;
+  aiConsentVersion: string | null;
+  aiProvider: "GEMINI" | "AGENTROUTER";
   geminiModel: string;
   agentRouterModel: string;
   budgetAlertThreshold: number;
@@ -23,19 +25,20 @@ export interface AiModelOption {
   label: string;
 }
 
-export function useAiModels() {
+export function useAiModels(enabled = true) {
   return useQuery({
-    queryKey: ['ai-models'],
+    queryKey: ["ai-models"],
     queryFn: () =>
-      api.get<Record<'GEMINI' | 'AGENTROUTER', AiModelOption[]>>('/ai/models'),
+      api.get<Record<"GEMINI" | "AGENTROUTER", AiModelOption[]>>("/ai/models"),
     staleTime: 1000 * 60 * 60,
+    enabled,
   });
 }
 
 export function useProfile() {
   return useQuery({
-    queryKey: ['profile'],
-    queryFn: () => api.get<AuthUser>('/users/me'),
+    queryKey: ["profile"],
+    queryFn: () => api.get<AuthUser>("/users/me"),
   });
 }
 
@@ -45,10 +48,10 @@ export function useUpdateProfile() {
   const user = useAuthStore((s) => s.user);
   return useMutation({
     mutationFn: (data: { firstName?: string; lastName?: string }) =>
-      api.patch<AuthUser>('/users/me', data),
+      api.patch<AuthUser>("/users/me", data),
     onSuccess: (updated) => {
       if (user) setUser({ ...user, ...updated });
-      qc.invalidateQueries({ queryKey: ['profile'] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
     },
   });
 }
@@ -56,30 +59,35 @@ export function useUpdateProfile() {
 export function useChangePassword() {
   return useMutation({
     mutationFn: (data: { currentPassword: string; newPassword: string }) =>
-      api.post('/auth/change-password', data),
+      api.post("/auth/change-password", data),
   });
 }
 
 export function useUserSettings() {
   return useQuery({
-    queryKey: ['user-settings'],
-    queryFn: () => api.get<UserSettings>('/settings'),
+    queryKey: ["user-settings"],
+    queryFn: () => api.get<UserSettings>("/settings"),
   });
 }
 
 // Only these fields are accepted by the backend UpdateSettingsDto.
-const SETTINGS_KEYS: (keyof UserSettings)[] = [
-  'language',
-  'currency',
-  'theme',
-  'notificationsEnabled',
-  'emailNotifications',
-  'aiEnabled',
-  'aiProvider',
-  'geminiModel',
-  'agentRouterModel',
-  'budgetAlertThreshold',
-  'largeExpenseThreshold',
+export type UpdateSettingsInput = Partial<UserSettings> & {
+  aiConsentConfirmed?: boolean;
+};
+
+const SETTINGS_KEYS: (keyof UpdateSettingsInput)[] = [
+  "language",
+  "currency",
+  "theme",
+  "notificationsEnabled",
+  "emailNotifications",
+  "aiEnabled",
+  "aiConsentConfirmed",
+  "aiProvider",
+  "geminiModel",
+  "agentRouterModel",
+  "budgetAlertThreshold",
+  "largeExpenseThreshold",
 ];
 
 export function useUpdateSettings() {
@@ -87,15 +95,16 @@ export function useUpdateSettings() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   return useMutation({
-    mutationFn: (data: Partial<UserSettings>) => {
+    mutationFn: (data: UpdateSettingsInput) => {
       // Strip server-managed fields (id, userId, timestamps) — the DTO rejects them.
-      const payload: Partial<UserSettings> = {};
+      const payload: UpdateSettingsInput = {};
       for (const k of SETTINGS_KEYS) {
         if (data[k] !== undefined) (payload as any)[k] = data[k];
       }
-      return api.patch<UserSettings>('/settings', payload);
+      return api.patch<UserSettings>("/settings", payload);
     },
     onSuccess: (updated) => {
+      qc.setQueryData(["user-settings"], updated);
       if (user) {
         setUser({
           ...user,
@@ -106,29 +115,31 @@ export function useUpdateSettings() {
           },
         });
       }
-      qc.invalidateQueries({ queryKey: ['user-settings'] });
+      qc.invalidateQueries({ queryKey: ["user-settings"] });
       // Currency change affects money formatting everywhere.
-      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
 
 export function useDeleteAccount() {
-  return useMutation({ mutationFn: () => api.delete('/users/me') });
+  return useMutation({ mutationFn: () => api.delete("/users/me") });
 }
 
 export async function exportUserData() {
   const token = useAuthStore.getState().accessToken;
   const res = await fetch(`${API_URL}/settings/export`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: 'include',
+    credentials: "include",
   });
-  if (!res.ok) throw new Error('Export failed');
+  if (!res.ok) throw new Error("Export failed");
   const json = await res.json();
   const data = json?.data ?? json;
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = `fintrack-data-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);

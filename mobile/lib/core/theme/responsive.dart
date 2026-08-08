@@ -4,12 +4,23 @@ import 'package:flutter/material.dart';
 /// treatment (side navigation, wider content, multi-column grids).
 class Breakpoints {
   Breakpoints._();
+  static const double compactPhone = 360;
   static const double tablet = 800;
   static const double desktop = 1200;
 }
 
 extension ResponsiveContext on BuildContext {
   double get screenWidth => MediaQuery.sizeOf(this).width;
+  bool get isCompactPhone => screenWidth < Breakpoints.compactPhone;
+
+  /// Compact layouts are also used on ordinary phones when the user has
+  /// increased system text size. Reflowing is preferable to disabling text
+  /// scaling or forcing important labels into unreadably small type.
+  bool get useCompactLayout {
+    final scaledBody = MediaQuery.textScalerOf(this).scale(14);
+    return isCompactPhone || (screenWidth < 430 && scaledBody > 16.5);
+  }
+
   bool get isTablet => screenWidth >= Breakpoints.tablet;
   bool get isDesktop => screenWidth >= Breakpoints.desktop;
 
@@ -17,8 +28,8 @@ extension ResponsiveContext on BuildContext {
   int get gridColumns => screenWidth >= Breakpoints.desktop
       ? 4
       : screenWidth >= Breakpoints.tablet
-          ? 3
-          : 2;
+      ? 3
+      : 2;
 }
 
 /// Centres its child and caps its width so text lines and cards never stretch
@@ -33,10 +44,10 @@ class ResponsiveCenter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: child,
-        ),
-      );
+    alignment: Alignment.topCenter,
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: child,
+    ),
+  );
 }

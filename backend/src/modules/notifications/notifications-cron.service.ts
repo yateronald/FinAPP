@@ -4,6 +4,7 @@ import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { NotificationsService } from './notifications.service';
+import { AI_CONSENT_VERSION } from '../../common/constants/ai-consent';
 
 @Injectable()
 export class NotificationsCronService {
@@ -23,7 +24,17 @@ export class NotificationsCronService {
   async handleMonthlyAiSummaryCron() {
     this.logger.log('Starting Monthly AI Summary Notification Cron Job...');
     const users = await this.prisma.user.findMany({
-      where: { isActive: true, deletedAt: null },
+      where: {
+        isActive: true,
+        deletedAt: null,
+        settings: {
+          is: {
+            aiEnabled: true,
+            aiConsentAt: { not: null },
+            aiConsentVersion: AI_CONSENT_VERSION,
+          },
+        },
+      },
       select: { id: true },
     });
 
@@ -60,7 +71,17 @@ export class NotificationsCronService {
   async handleWeeklyAiTipCron() {
     this.logger.log('Starting Weekly AI Tip Notification Cron Job...');
     const users = await this.prisma.user.findMany({
-      where: { isActive: true, deletedAt: null },
+      where: {
+        isActive: true,
+        deletedAt: null,
+        settings: {
+          is: {
+            aiEnabled: true,
+            aiConsentAt: { not: null },
+            aiConsentVersion: AI_CONSENT_VERSION,
+          },
+        },
+      },
       select: { id: true },
     });
 

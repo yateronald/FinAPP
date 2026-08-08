@@ -148,7 +148,11 @@ model UserSettings {
   theme                 Theme    @default(SYSTEM)
   notificationsEnabled  Boolean  @default(true) @map("notifications_enabled")
   emailNotifications    Boolean  @default(true) @map("email_notifications")
-  aiEnabled             Boolean  @default(true) @map("ai_enabled")
+  aiEnabled             Boolean  @default(false) @map("ai_enabled")
+  /// Timestamp and disclosure version accepted before financial data may be
+  /// processed by an AI provider. `aiEnabled` alone is never proof of consent.
+  aiConsentAt           DateTime? @map("ai_consent_at")
+  aiConsentVersion      String?   @map("ai_consent_version")
   aiProvider            AiProvider @default(GEMINI) @map("ai_provider")
   geminiModel           String   @default("gemini-3.5-flash") @map("gemini_model")
   agentRouterModel      String   @default("claude-opus-4-8") @map("agentrouter_model")

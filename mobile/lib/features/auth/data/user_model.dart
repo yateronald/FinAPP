@@ -5,6 +5,8 @@ class UserSettings {
   final bool notificationsEnabled;
   final bool emailNotifications;
   final bool aiEnabled;
+  final DateTime? aiConsentAt;
+  final String? aiConsentVersion;
   final String aiProvider;
   final String geminiModel;
   final String agentRouterModel;
@@ -15,23 +17,31 @@ class UserSettings {
     required this.theme,
     this.notificationsEnabled = true,
     this.emailNotifications = true,
-    this.aiEnabled = true,
+    this.aiEnabled = false,
+    this.aiConsentAt,
+    this.aiConsentVersion,
     this.aiProvider = 'GEMINI',
     this.geminiModel = 'gemini-3.5-flash',
     this.agentRouterModel = 'claude-opus-4-8',
   });
 
   factory UserSettings.fromJson(Map<String, dynamic> j) => UserSettings(
-        language: j['language'] ?? 'FR',
-        currency: j['currency'] ?? 'XOF',
-        theme: j['theme'] ?? 'SYSTEM',
-        notificationsEnabled: j['notificationsEnabled'] ?? true,
-        emailNotifications: j['emailNotifications'] ?? true,
-        aiEnabled: j['aiEnabled'] ?? true,
-        aiProvider: j['aiProvider'] ?? 'GEMINI',
-        geminiModel: j['geminiModel'] ?? 'gemini-3.5-flash',
-        agentRouterModel: j['agentRouterModel'] ?? 'claude-opus-4-8',
-      );
+    language: j['language'] ?? 'FR',
+    currency: j['currency'] ?? 'XOF',
+    theme: j['theme'] ?? 'SYSTEM',
+    notificationsEnabled: j['notificationsEnabled'] ?? true,
+    emailNotifications: j['emailNotifications'] ?? true,
+    // AI is always opt-in. Missing or older settings must never silently
+    // turn it on in the client.
+    aiEnabled: j['aiEnabled'] == true,
+    aiConsentAt: j['aiConsentAt'] == null
+        ? null
+        : DateTime.tryParse(j['aiConsentAt'].toString()),
+    aiConsentVersion: j['aiConsentVersion'] as String?,
+    aiProvider: j['aiProvider'] ?? 'GEMINI',
+    geminiModel: j['geminiModel'] ?? 'gemini-3.5-flash',
+    agentRouterModel: j['agentRouterModel'] ?? 'claude-opus-4-8',
+  );
 }
 
 class AppUser {
@@ -62,7 +72,10 @@ class AppUser {
   });
 
   String get displayName {
-    final n = [firstName, lastName].where((e) => e != null && e.isNotEmpty).join(' ');
+    final n = [
+      firstName,
+      lastName,
+    ].where((e) => e != null && e.isNotEmpty).join(' ');
     return n.isNotEmpty ? n : email.split('@').first;
   }
 
@@ -74,18 +87,18 @@ class AppUser {
   String get currency => settings?.currency ?? 'XOF';
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
-        id: j['id'] ?? '',
-        email: j['email'] ?? '',
-        firstName: j['firstName'],
-        lastName: j['lastName'],
-        avatarUrl: j['avatarUrl'],
-        emailVerified: j['emailVerified'] ?? false,
-        settings: j['settings'] != null
-            ? UserSettings.fromJson(Map<String, dynamic>.from(j['settings']))
-            : null,
-        // Only /users/me carries these. Elsewhere (login response) default to
-        // "has a password" so we never wrongly hide the current-password field.
-        hasPassword: j['hasPassword'] ?? true,
-        hasGoogle: j['hasGoogle'] ?? false,
-      );
+    id: j['id'] ?? '',
+    email: j['email'] ?? '',
+    firstName: j['firstName'],
+    lastName: j['lastName'],
+    avatarUrl: j['avatarUrl'],
+    emailVerified: j['emailVerified'] ?? false,
+    settings: j['settings'] != null
+        ? UserSettings.fromJson(Map<String, dynamic>.from(j['settings']))
+        : null,
+    // Only /users/me carries these. Elsewhere (login response) default to
+    // "has a password" so we never wrongly hide the current-password field.
+    hasPassword: j['hasPassword'] ?? true,
+    hasGoogle: j['hasGoogle'] ?? false,
+  );
 }

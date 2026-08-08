@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/storage/app_prefs.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/brand_logo.dart';
 import '../auth/providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -47,44 +46,41 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    // Deliberately light in both themes: the launch artwork carries a navy
+    // wordmark that would disappear on the dark palette, and the native first
+    // frame is white — keeping this light makes the hand-over seamless instead
+    // of flashing white then dark.
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: dark
-                ? [const Color(0xFF141B2E), const Color(0xFF0B1120)]
-                : [const Color(0xFFEFEEFB), Colors.white],
+            colors: [Color(0xFFEFEEFB), Colors.white],
           ),
         ),
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const BrandLogo(size: 118, showText: false)
+              // Mark + wordmark in one asset — no separate "Fynexa" text,
+              // which would double it up.
+              Image.asset(
+                'img/logo_launch.png',
+                width: 190,
+                filterQuality: FilterQuality.high,
+              )
                   .animate()
                   .scale(duration: 500.ms, curve: Curves.easeOutBack)
                   .fadeIn(),
-              const SizedBox(height: 20),
-              Text(
-                'Fynexa',
-                style: TextStyle(
-                  color: dark ? Colors.white : const Color(0xFF1E293B),
-                  fontSize: 36,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3, end: 0),
-              const SizedBox(height: 8),
+              const SizedBox(height: 22),
               Text(
                 'Gérez. Épargnez. Atteignez vos objectifs.',
                 style: TextStyle(
-                    color: (dark ? Colors.white : const Color(0xFF64748B))
-                        .withValues(alpha: 0.85),
-                    fontSize: 14),
-              ).animate().fadeIn(delay: 400.ms),
+                  color: const Color(0xFF64748B).withValues(alpha: 0.9),
+                  fontSize: 14,
+                ),
+              ).animate().fadeIn(delay: 300.ms),
               const SizedBox(height: 40),
               const SizedBox(
                 width: 26,
@@ -93,7 +89,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   strokeWidth: 2.4,
                   valueColor: AlwaysStoppedAnimation(AppColors.primary),
                 ),
-              ).animate().fadeIn(delay: 600.ms),
+              ).animate().fadeIn(delay: 500.ms),
             ],
           ),
         ),

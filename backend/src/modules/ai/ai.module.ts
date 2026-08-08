@@ -7,6 +7,7 @@ import { ForecastService } from './forecast.service';
 import { GeminiClient } from './gemini.client';
 import { AgentRouterClient } from './agentrouter.client';
 import { LlmService } from './llm.service';
+import { AiEnabledGuard } from './ai-enabled.guard';
 
 @Module({
   imports: [DashboardModule],
@@ -18,6 +19,7 @@ import { LlmService } from './llm.service';
     GeminiClient,
     AgentRouterClient,
     LlmService,
+    AiEnabledGuard,
   ],
   exports: [AiService],
 })

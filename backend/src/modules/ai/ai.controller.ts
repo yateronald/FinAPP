@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AiService } from './ai.service';
@@ -6,10 +6,12 @@ import { AiChatService } from './ai-chat.service';
 import { ForecastService } from './forecast.service';
 import { AskAiDto, ChatDto } from './dto/ai.dto';
 import { AI_MODELS } from './ai-models';
+import { AiEnabledGuard } from './ai-enabled.guard';
 
 @ApiTags('ai')
 @ApiBearerAuth()
 @Controller('ai')
+@UseGuards(AiEnabledGuard)
 export class AiController {
   constructor(
     private readonly ai: AiService,

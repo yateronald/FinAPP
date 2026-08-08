@@ -34,6 +34,15 @@ export class UpdateSettingsDto {
   @IsBoolean()
   aiEnabled?: boolean;
 
+  @ApiProperty({
+    required: false,
+    description:
+      'Must be true in the same request that enables AI, confirming the data-use disclosure.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  aiConsentConfirmed?: boolean;
+
   @ApiProperty({ enum: AiProvider, required: false })
   @IsOptional()
   @IsEnum(AiProvider)

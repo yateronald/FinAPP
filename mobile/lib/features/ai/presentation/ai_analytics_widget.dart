@@ -7,8 +7,10 @@ import '../../../core/i18n/app_text.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../shell/shell_providers.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../data/ai_models.dart';
 import '../providers/ai_providers.dart';
+import 'ai_access.dart';
 
 class RealAiAnalyticsWidget extends ConsumerStatefulWidget {
   final DateTime date;
@@ -22,7 +24,8 @@ class RealAiAnalyticsWidget extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<RealAiAnalyticsWidget> createState() => _RealAiAnalyticsWidgetState();
+  ConsumerState<RealAiAnalyticsWidget> createState() =>
+      _RealAiAnalyticsWidgetState();
 }
 
 class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
@@ -42,6 +45,13 @@ class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = ref.watch(
+      authProvider.select((state) => state.user?.settings?.aiEnabled == true),
+    );
+    // Do not construct/watch the auto-generating insights provider until the
+    // user has opted in. This covers dashboard, budgets and finances.
+    if (!enabled) return const AiDisabledState(compact: true);
+
     final param = AiInsightsParam(widget.date, scope: widget.scope);
     final state = ref.watch(aiInsightsProvider(param));
     final controller = ref.read(aiInsightsProvider(param).notifier);
@@ -71,16 +81,26 @@ class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
                       gradient: AppColors.brandGradient,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 14),
+                    child: const Icon(
+                      Icons.auto_awesome_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     title,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
@@ -100,7 +120,10 @@ class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
                 onTap: state.isLoading ? null : () => controller.generate(),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: context.surfaceAlt,
                     borderRadius: BorderRadius.circular(20),
@@ -113,10 +136,17 @@ class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
                         const SizedBox(
                           width: 12,
                           height: 12,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
                         )
                       else
-                        const Icon(Icons.refresh_rounded, size: 14, color: AppColors.primary),
+                        const Icon(
+                          Icons.refresh_rounded,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
                       const SizedBox(width: 4),
                       Text(
                         state.isLoading ? 'Analyse...' : 'Actualiser',
@@ -219,8 +249,11 @@ class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
               color: AppColors.primary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(13),
             ),
-            child: const Icon(Icons.insights_rounded,
-                color: AppColors.primary, size: 21),
+            child: const Icon(
+              Icons.insights_rounded,
+              color: AppColors.primary,
+              size: 21,
+            ),
           ),
           const SizedBox(width: 13),
           Expanded(
@@ -230,12 +263,19 @@ class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
               children: [
                 Text(
                   t.aiNoDataTitle,
-                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: TextStyle(fontSize: 12, height: 1.35, color: context.muted),
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: context.muted,
+                  ),
                 ),
               ],
             ),
@@ -262,7 +302,11 @@ class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
           children: [
             Container(width: 140, height: 12, color: context.surfaceAlt),
             const SizedBox(height: 8),
-            Container(width: double.infinity, height: 10, color: context.surfaceAlt),
+            Container(
+              width: double.infinity,
+              height: 10,
+              color: context.surfaceAlt,
+            ),
             const SizedBox(height: 6),
             Container(width: 180, height: 10, color: context.surfaceAlt),
           ],
@@ -280,19 +324,31 @@ class _RealAiAnalyticsWidgetState extends ConsumerState<RealAiAnalyticsWidget> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 16),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: AppColors.danger,
+            size: 16,
+          ),
           const SizedBox(width: 8),
           const Expanded(
             child: Text(
               'Erreur lors de l\'analyse IA.',
-              style: TextStyle(color: AppColors.danger, fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: AppColors.danger,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           InkWell(
             onTap: () => controller.generate(),
             child: const Text(
               'Réessayer',
-              style: TextStyle(color: AppColors.danger, fontSize: 11.5, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: AppColors.danger,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -332,13 +388,21 @@ class _CompactInsightCard extends StatelessWidget {
   final RealAiInsight insight;
   final int index;
   final WidgetRef ref;
-  const _CompactInsightCard({required this.insight, required this.index, required this.ref});
+  const _CompactInsightCard({
+    required this.insight,
+    required this.index,
+    required this.ref,
+  });
 
   @override
   Widget build(BuildContext context) {
     final (accentColor, iconData, _) = switch (insight.severity) {
       'critical' => (AppColors.danger, Icons.error_outline_rounded, 'Alerte'),
-      'warning' => (AppColors.warning, Icons.warning_amber_rounded, 'Attention'),
+      'warning' => (
+        AppColors.warning,
+        Icons.warning_amber_rounded,
+        'Attention',
+      ),
       _ => (AppColors.primary, Icons.lightbulb_outline_rounded, 'Conseil'),
     };
 
@@ -385,12 +449,18 @@ class _CompactInsightCard extends StatelessWidget {
                         insight.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: accentColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
@@ -435,7 +505,12 @@ class _CompactInsightCard extends StatelessWidget {
           color: context.colors.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: EdgeInsets.fromLTRB(20, 14, 20, 20 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          14,
+          20,
+          20 + MediaQuery.of(context).padding.bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,12 +528,19 @@ class _CompactInsightCard extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 20),
+                const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     insight.title,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ],
@@ -485,7 +567,9 @@ class _CompactInsightCard extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
             ),
