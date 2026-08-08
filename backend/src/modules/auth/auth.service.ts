@@ -43,6 +43,18 @@ const OTP_MAX_ATTEMPTS = 3;
 /** Explicit resends allowed within a rolling hour, per user and purpose. */
 const OTP_MAX_RESENDS_PER_HOUR = 3;
 
+/**
+ * Brute-force lockout.
+ *
+ * Note the trade-off this makes: locking an account on failed passwords means
+ * anyone who knows an address can lock its owner out by guessing five times.
+ * That is accepted here because the alternative — unlimited guessing against
+ * financial data — is worse, and because a password reset clears the lock, so
+ * the real owner always has a way back in through their mailbox.
+ */
+const MAX_FAILED_LOGINS = 5;
+const LOCKOUT_HOURS = 5;
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -139,6 +151,23 @@ export class AuthService {
     };
   }
 
+  /**
+   * 423 Locked, carrying when sign-in becomes possible again so the app can
+   * show a real countdown instead of asking the user to keep trying.
+   */
+  private lockedError(until: Date, email: string) {
+    return new HttpException(
+      {
+        message: 'Too many failed attempts. This account is temporarily locked.',
+        code: 'ACCOUNT_LOCKED',
+        email,
+        lockedUntil: until.toISOString(),
+        retryAfter: Math.max(1, Math.ceil((until.getTime() - Date.now()) / 1000)),
+      },
+      423, // Locked — absent from this Nest version's HttpStatus enum.
+    );
+  }
+
   // ------------------------------------------------------------------- Login
   async login(dto: LoginDto, device: DeviceContext) {
     const user = await this.prisma.user.findFirst({
@@ -165,10 +194,56 @@ export class AuthService {
       throw new UnauthorizedException('Account is disabled');
     }
 
+    // Checked before the password, so a locked account cannot be probed by
+    // watching how long a response takes.
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      await auditFailure('ACCOUNT_LOCKED');
+      throw this.lockedError(user.lockedUntil, user.email);
+    }
+
     const valid = await this.tokens.verifyPassword(user.passwordHash, dto.password);
     if (!valid) {
+      const attempts = user.failedLoginAttempts + 1;
+      const lockNow = attempts >= MAX_FAILED_LOGINS;
+      const lockedUntil = lockNow
+        ? new Date(Date.now() + LOCKOUT_HOURS * 60 * 60 * 1000)
+        : null;
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        // The counter resets with the lock: the next streak starts clean once
+        // the window passes, rather than locking again on a single mistake.
+        data: lockNow
+          ? { failedLoginAttempts: 0, lockedUntil }
+          : { failedLoginAttempts: attempts },
+      });
+
+      if (lockNow) {
+        await this.audit.log({
+          userId: user.id,
+          action: 'ACCOUNT_LOCKED',
+          entity: 'User',
+          entityId: user.id,
+          metadata: { email: dto.email, until: lockedUntil!.toISOString() },
+          ...device,
+        });
+        throw this.lockedError(lockedUntil!, user.email);
+      }
+
       await auditFailure('BAD_PASSWORD');
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException({
+        message: 'Invalid credentials',
+        code: 'BAD_CREDENTIALS',
+        attemptsLeft: MAX_FAILED_LOGINS - attempts,
+      });
+    }
+
+    // A good password ends the streak.
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
     }
 
     // Admin accounts are web-only: the mobile app has no admin UI, so signing in
@@ -364,7 +439,9 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash },
+      // Clearing the lock here is what stops a lockout from being permanent:
+      // whoever holds the mailbox can always get back in.
+      data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null },
     });
     await this.tokens.revokeAllForUser(user.id);
     await this.audit.log({ userId: user.id, action: 'PASSWORD_RESET', entity: 'User', entityId: user.id });

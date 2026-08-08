@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../data/auth_repository.dart';
 import '../providers/auth_provider.dart';
 import 'auth_widgets.dart';
+import 'forgot_password_dialog.dart';
 import 'verification_prompt.dart';
 import 'google_auth_button.dart';
 
@@ -62,6 +63,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // just proceed to home.
       if (ref.read(authProvider).status == AuthStatus.authenticated) {
         if (mounted) context.go('/home');
+      } else if (e is ApiException && e.code == 'ACCOUNT_LOCKED') {
+        // Five wrong passwords: the account is suspended, so show the
+        // countdown and the one action that ends it.
+        if (mounted) {
+          context.push('/account-locked', extra: {
+            'email': e.email ?? _email.text.trim(),
+            'lockedUntil': e.lockedUntil ??
+                DateTime.now().add(Duration(seconds: e.retryAfter ?? 0)),
+          });
+        }
+      } else if (e is ApiException &&
+          e.code == 'BAD_CREDENTIALS' &&
+          e.attemptsLeft != null &&
+          e.attemptsLeft! <= 2) {
+        // Warn before the lock lands, not after.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${e.message} — ${context.t.accountLockAttemptsLeft(e.attemptsLeft!)}',
+              ),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+        }
       } else if (e is ApiException && e.code == 'EMAIL_NOT_VERIFIED') {
         // The account exists and the password was right — it simply has not
         // confirmed its address yet, and the server already sent a code.
@@ -82,34 +108,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _forgotPassword() async {
-    final controller = TextEditingController(text: _email.text.trim());
-    final email = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.t.forgotTitle),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(context.t.forgotBody),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(hintText: 'you@example.com'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(context.t.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: Text(context.t.send),
-          ),
-        ],
-      ),
+    final email = await showForgotPasswordDialog(
+      context,
+      initialEmail: _email.text.trim(),
     );
     if (email == null || email.isEmpty) return;
     var throttled = false;

@@ -10,8 +10,20 @@ import {
   MinLength,
   IsBoolean,
   Equals,
+  Matches,
 } from 'class-validator';
 import { Language } from '@prisma/client';
+
+/**
+ * Password policy, enforced server-side so the rule the app advertises is a
+ * real one. Applied wherever a password is chosen: sign-up and reset.
+ */
+export const PASSWORD_PATTERN =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+export const PASSWORD_MESSAGE =
+  'Password must be at least 8 characters and include an uppercase letter, ' +
+  'a lowercase letter, a digit and a special character.';
+
 
 export class RegisterDto {
   @ApiProperty({ example: 'user@example.com' })
@@ -22,6 +34,7 @@ export class RegisterDto {
   @IsString()
   @MinLength(8)
   @MaxLength(72)
+  @Matches(PASSWORD_PATTERN, { message: PASSWORD_MESSAGE })
   password: string;
 
   @ApiProperty({ example: 'Yate', required: false })
@@ -112,6 +125,7 @@ export class ResetPasswordDto {
   @IsString()
   @MinLength(8)
   @MaxLength(72)
+  @Matches(PASSWORD_PATTERN, { message: PASSWORD_MESSAGE })
   newPassword: string;
 }
 

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
+import '../../features/auth/presentation/account_locked_screen.dart';
 import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/auth/presentation/verify_screen.dart';
 import '../../features/onboarding/splash_screen.dart';
@@ -25,6 +26,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+      GoRoute(
+        path: '/account-locked',
+        builder: (_, state) {
+          final extra = (state.extra as Map?) ?? const {};
+          return AccountLockedScreen(
+            email: (extra['email'] ?? '') as String,
+            lockedUntil:
+                (extra['lockedUntil'] as DateTime?) ?? DateTime.now(),
+          );
+        },
+      ),
       GoRoute(
         path: '/reset-password',
         builder: (_, state) =>

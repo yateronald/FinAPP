@@ -356,6 +356,43 @@ class AppText {
   String get verifyChangeAccount =>
       _s('Utiliser un autre compte', 'Use another account');
 
+  // Account lockout
+  String get accountLockTitle => _s('Compte temporairement verrouillé', 'Account temporarily locked');
+  String get accountLockBody => _s(
+    'Après 5 tentatives incorrectes, l’accès est suspendu pour protéger votre '
+        'compte. Réessayez plus tard, ou réinitialisez votre mot de passe pour '
+        'y accéder tout de suite.',
+    'After 5 incorrect attempts, access is suspended to protect your account. '
+        'Try again later, or reset your password to get back in right away.',
+  );
+  String get accountLockUnlocksIn => _s('Déverrouillage dans', 'Unlocks in');
+  String get accountLockResetNow =>
+      _s('Réinitialiser mon mot de passe', 'Reset my password');
+  String get accountLockBackToLogin => _s('Retour à la connexion', 'Back to sign-in');
+  String get accountLockExpired =>
+      _s('Vous pouvez réessayer', 'You can try again now');
+  String accountLockAttemptsLeft(int n) => _s(
+    n > 1 ? 'Il reste $n tentatives' : 'Dernière tentative avant verrouillage',
+    n > 1 ? '$n attempts remaining' : 'Last attempt before lockout',
+  );
+
+  // Forgot-password dialog
+  String get forgotDialogTitle =>
+      _s('Réinitialiser votre mot de passe', 'Reset your password');
+  String get forgotDialogBody => _s(
+    'Entrez votre adresse e-mail et nous vous enverrons un code de réinitialisation.',
+    'Enter your e-mail address and we will send you a reset code.',
+  );
+  String get emailLabel => _s('Adresse e-mail', 'E-mail address');
+  String get emailPlaceholder => _s('vous@exemple.com', 'you@example.com');
+  String get forgotPrivacyNote => _s(
+    'Nous ne partagerons jamais votre e-mail avec des tiers.',
+    'We will never share your e-mail with third parties.',
+  );
+  String get forgotSendCode => _s('Envoyer le code', 'Send the code');
+  String get secureAndPrivate =>
+      _s('Sécurisé et confidentiel', 'Secure and private');
+
   // Password reset
   String get resetHeadline =>
       _s('Nouveau mot de passe', 'New password');
@@ -369,10 +406,25 @@ class AppText {
       _s('Confirmez le mot de passe', 'Confirm password');
   String get resetMismatch =>
       _s('Les mots de passe ne correspondent pas', 'Passwords do not match');
-  String get resetTooShort => _s(
-    'Au moins 8 caractères, avec une majuscule et un chiffre',
-    'At least 8 characters, with an uppercase letter and a digit',
+  String get resetRules => _s(
+    'Utilisez au moins 8 caractères avec une majuscule, une minuscule, '
+        'un chiffre et un caractère spécial.',
+    'Use at least 8 characters with an uppercase letter, a lowercase letter, '
+        'a digit and a special character.',
   );
+  String get resetTooShort => _s(
+    'Mot de passe trop faible',
+    'Password is too weak',
+  );
+  String get resetCodeLabel => _s('Code de vérification', 'Verification code');
+  String get resetChangeEmail => _s('Modifier', 'Change');
+  String get resetSecurityTitle => _s('Sécurité garantie', 'Your data is safe');
+  String get resetSecurityBody => _s(
+    'Vos informations sont cryptées et sécurisées.',
+    'Your information is encrypted and protected.',
+  );
+  String resetExpiresIn(String mmss) =>
+      _s('Le code expire dans $mmss', 'The code expires in $mmss');
   String get resetAction =>
       _s('Réinitialiser', 'Reset password');
   String get resetDone => _s(

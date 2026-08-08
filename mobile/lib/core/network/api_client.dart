@@ -20,6 +20,9 @@ class ApiException implements Exception {
   final int? attemptsLeft;
   final int? retryAfter;
 
+  /// When a locked account may sign in again.
+  final DateTime? lockedUntil;
+
   ApiException(
     this.message, [
     this.statusCode,
@@ -27,6 +30,7 @@ class ApiException implements Exception {
     this.email,
     this.attemptsLeft,
     this.retryAfter,
+    this.lockedUntil,
   ]);
   @override
   String toString() => message;
@@ -134,11 +138,13 @@ class ApiClient {
     String? email;
     int? attemptsLeft;
     int? retryAfter;
+    DateTime? lockedUntil;
     if (data is Map) {
       code = data['code'] as String?;
       email = data['email'] as String?;
       attemptsLeft = (data['attemptsLeft'] as num?)?.toInt();
       retryAfter = (data['retryAfter'] as num?)?.toInt();
+      lockedUntil = DateTime.tryParse((data['lockedUntil'] ?? '') as String)?.toLocal();
     }
     return ApiException(
       message,
@@ -147,6 +153,7 @@ class ApiClient {
       email,
       attemptsLeft,
       retryAfter,
+      lockedUntil,
     );
   }
 

@@ -34,6 +34,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let attemptsLeft: number | undefined;
     let retryAfter: number | undefined;
     let codeSent: boolean | undefined;
+    /// ISO instant at which a locked account can sign in again.
+    let lockedUntil: string | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -49,6 +51,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         attemptsLeft = (res as any).attemptsLeft;
         retryAfter = (res as any).retryAfter;
         codeSent = (res as any).codeSent;
+        lockedUntil = (res as any).lockedUntil;
       }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       const mapped = this.mapPrismaError(exception);
@@ -77,6 +80,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ...(attemptsLeft !== undefined ? { attemptsLeft } : {}),
       ...(retryAfter !== undefined ? { retryAfter } : {}),
       ...(codeSent !== undefined ? { codeSent } : {}),
+      ...(lockedUntil ? { lockedUntil } : {}),
       path: request.url,
       timestamp: new Date().toISOString(),
     });

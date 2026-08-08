@@ -109,6 +109,13 @@ model User {
   /// Last time the countdown reminder went out, so it fires once a day.
   verificationRemindedAt DateTime? @map("verification_reminded_at")
 
+  /// Consecutive wrong passwords. Cleared on any successful sign-in, and by a
+  /// password reset — proving control of the mailbox is stronger evidence
+  /// than the lock it clears.
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  /// Set once the streak hits the limit; sign-in is refused until it passes.
+  lockedUntil         DateTime? @map("locked_until")
+
   googleId          String?   @unique @map("google_id")
   isActive          Boolean   @default(true) @map("is_active")
   lastLoginAt       DateTime? @map("last_login_at")
