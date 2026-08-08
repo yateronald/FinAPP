@@ -100,6 +100,32 @@ class _ChangePasswordSheetState extends ConsumerState<ChangePasswordSheet> {
                 const SizedBox(height: 8),
                 Text(context.t.setPasswordSubtitle,
                     style: TextStyle(fontSize: 12.5, height: 1.4, color: context.muted)),
+                const SizedBox(height: 12),
+                // Setting a password retires Google sign-in on this account.
+                // Say it here, rather than letting them discover it at the
+                // login screen with no way back.
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.11),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline_rounded,
+                          size: 16, color: AppColors.warning),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          context.t.setPasswordDisablesGoogle,
+                          style: TextStyle(
+                              fontSize: 11.5, height: 1.4, color: context.muted),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
               const SizedBox(height: 18),
               // A Google-created account has no current password to confirm.

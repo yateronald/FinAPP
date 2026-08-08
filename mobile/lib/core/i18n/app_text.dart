@@ -356,6 +356,53 @@ class AppText {
   String get verifyChangeAccount =>
       _s('Utiliser un autre compte', 'Use another account');
 
+  // Password reset
+  String get resetHeadline =>
+      _s('Nouveau mot de passe', 'New password');
+  String get resetIntro => _s(
+    'Saisissez le code reçu par e-mail, puis choisissez votre nouveau mot de passe.',
+    'Enter the code we e-mailed you, then choose your new password.',
+  );
+  String get resetNewPassword =>
+      _s('Nouveau mot de passe', 'New password');
+  String get resetConfirmPassword =>
+      _s('Confirmez le mot de passe', 'Confirm password');
+  String get resetMismatch =>
+      _s('Les mots de passe ne correspondent pas', 'Passwords do not match');
+  String get resetTooShort => _s(
+    'Au moins 8 caractères, avec une majuscule et un chiffre',
+    'At least 8 characters, with an uppercase letter and a digit',
+  );
+  String get resetAction =>
+      _s('Réinitialiser', 'Reset password');
+  String get resetDone => _s(
+    'Mot de passe réinitialisé. Connectez-vous.',
+    'Password reset. Please sign in.',
+  );
+  String get resetSessionsRevoked => _s(
+    'Toutes vos autres sessions ont été déconnectées.',
+    'All your other sessions have been signed out.',
+  );
+
+  // Verification banner / badge
+  String verifyBannerTitle(int days) => _s(
+    days > 1
+        ? 'Confirmez votre e-mail sous $days jours'
+        : 'Dernier jour pour confirmer votre e-mail',
+    days > 1
+        ? 'Confirm your e-mail within $days days'
+        : 'Last day to confirm your e-mail',
+  );
+  String get verifyBannerBody => _s(
+    'Sans confirmation, vous ne pourrez plus vous connecter ni réinitialiser '
+        'votre mot de passe.',
+    'Without it you will not be able to sign in, or reset your password.',
+  );
+  String get verifyBannerCta => _s('Confirmer maintenant', 'Confirm now');
+  String get verifyBannerLater => _s('Plus tard', 'Later');
+  String get emailVerifiedBadge => _s('Vérifié', 'Verified');
+  String get emailUnverifiedBadge => _s('Non vérifié', 'Not verified');
+
   // ---------------------------------------------------- App lock
   String get lockTitle => _s('Application verrouillée', 'App locked');
   String get lockSubtitle => _s(
@@ -1025,6 +1072,24 @@ class AppText {
     'An account already exists for $email. Sign in instead.',
   );
   String get googleAccountExistsCta => _s('Se connecter', 'Sign in');
+  String get googleHasPasswordTitle =>
+      _s('Ce compte a un mot de passe', 'This account has a password');
+  String googleHasPasswordBody(String email) => _s(
+    'Vous avez défini un mot de passe pour $email. Pour votre sécurité, '
+        'la connexion Google n’est plus disponible sur ce compte : '
+        'utilisez votre e-mail et votre mot de passe.',
+    'You set a password for $email. For your security, Google sign-in is no '
+        'longer available on this account — use your e-mail and password.',
+  );
+  String get googleHasPasswordCta =>
+      _s('Se connecter avec le mot de passe', 'Sign in with password');
+  String get setPasswordDisablesGoogle => _s(
+    'Attention : une fois un mot de passe défini, la connexion Google ne '
+        'fonctionnera plus sur ce compte. Vous pourrez toujours le '
+        'réinitialiser par e-mail.',
+    'Note: once you set a password, Google sign-in will no longer work on this '
+        'account. You can always reset it by e-mail.',
+  );
   String get googleUnavailable => _s(
     'Google Sign-In n’est pas disponible sur cet appareil.',
     'Google Sign-In is not available on this device.',

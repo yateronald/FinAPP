@@ -86,3 +86,45 @@ export function incomeReminder(lang: Lang): EngagementMessage {
     ),
   };
 }
+
+/**
+ * Countdown for accounts that predate mandatory verification. The tone gets
+ * firmer as the deadline nears, because the consequence is real: sign-in stops
+ * working once the window closes.
+ */
+export function verificationReminder(
+  lang: Lang,
+  daysLeft: number,
+  firstName?: string | null,
+): EngagementMessage {
+  const name = firstName?.trim();
+  const urgent = daysLeft <= 3;
+  return {
+    title: fr(
+      lang,
+      urgent
+        ? daysLeft <= 1
+          ? '⚠️ Dernier jour pour confirmer votre e-mail'
+          : `⚠️ Plus que ${daysLeft} jours pour confirmer votre e-mail`
+        : 'Confirmez votre adresse e-mail',
+      urgent
+        ? daysLeft <= 1
+          ? '⚠️ Last day to confirm your e-mail'
+          : `⚠️ ${daysLeft} days left to confirm your e-mail`
+        : 'Confirm your e-mail address',
+    ),
+    message: fr(
+      lang,
+      `${name ? `${name}, c` : 'C'}onfirmer votre adresse protège votre compte et ` +
+        'vous permet de réinitialiser votre mot de passe si vous l’oubliez. ' +
+        (urgent
+          ? `Sans confirmation, la connexion sera bloquée dans ${daysLeft <= 1 ? 'moins d’un jour' : `${daysLeft} jours`}.`
+          : `Il vous reste ${daysLeft} jours.`),
+      `${name ? `${name}, c` : 'C'}onfirming your address protects your account and ` +
+        'lets you reset your password if you ever forget it. ' +
+        (urgent
+          ? `Without it, sign-in stops working in ${daysLeft <= 1 ? 'less than a day' : `${daysLeft} days`}.`
+          : `You have ${daysLeft} days left.`),
+    ),
+  };
+}

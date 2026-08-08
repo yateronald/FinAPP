@@ -164,13 +164,22 @@ class SettingsScreen extends ConsumerWidget {
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        user?.email ?? '',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                        ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              user?.email ?? '',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          _VerifiedBadge(verified: user?.emailVerified ?? false),
+                        ],
                       ),
                     ],
                   ),
@@ -770,6 +779,44 @@ class _AiSettingsCardState extends ConsumerState<_AiSettingsCard> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Confirmation state of the account's address, next to the address itself —
+/// the one place a user looks to check it.
+class _VerifiedBadge extends StatelessWidget {
+  const _VerifiedBadge({required this.verified});
+  final bool verified;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: verified ? 0.20 : 0.26),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            verified ? Icons.verified_rounded : Icons.error_outline_rounded,
+            size: 12,
+            color: verified ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            verified ? t.emailVerifiedBadge : t.emailUnverifiedBadge,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: verified ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A),
             ),
           ),
         ],

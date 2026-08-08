@@ -5,6 +5,10 @@ import 'user_model.dart';
 class AuthRepository {
   final _api = ApiClient.instance;
 
+  /// Set by [login] when the account is still inside its verification grace
+  /// window. Read once by the UI, then cleared.
+  static ({String email, int daysLeft})? pendingVerification;
+
   Future<AppUser> login(String email, String password) async {
     final data = await _api.post('/auth/login',
         body: {'email': email, 'password': password}, auth: false);
@@ -12,6 +16,13 @@ class AuthRepository {
       access: data['accessToken'],
       refresh: data['refreshToken'],
     );
+    final pending = data['verificationPending'];
+    pendingVerification = pending is Map
+        ? (
+            email: (pending['email'] ?? email).toString(),
+            daysLeft: (pending['daysLeft'] as num?)?.toInt() ?? 0,
+          )
+        : null;
     return AppUser.fromJson(Map<String, dynamic>.from(data['user']));
   }
 
@@ -90,6 +101,11 @@ class AuthRepository {
 
   Future<void> forgotPassword(String email) =>
       _api.post('/auth/forgot-password', body: {'email': email}, auth: false);
+
+  Future<void> resetPassword(String email, String code, String newPassword) =>
+      _api.post('/auth/reset-password',
+          body: {'email': email, 'code': code, 'newPassword': newPassword},
+          auth: false);
 
   Future<AppUser> me() async {
     final data = await _api.get('/users/me');

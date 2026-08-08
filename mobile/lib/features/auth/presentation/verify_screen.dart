@@ -12,6 +12,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/responsive.dart';
 import '../providers/auth_provider.dart';
 import 'auth_widgets.dart';
+import 'otp_code_field.dart';
 
 /// Confirms ownership of the sign-up address.
 ///
@@ -207,7 +208,7 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
                   _Header(email: widget.email),
                   const SizedBox(height: 24),
 
-                  _CodeField(
+                  OtpCodeField(
                     controller: _controller,
                     focusNode: _focus,
                     length: _codeLength,
@@ -349,102 +350,6 @@ class _Header extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(
               fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary),
-        ),
-      ],
-    );
-  }
-}
-
-/// Six boxes over one hidden field: the OS keeps autofill and SMS/e-mail code
-/// suggestions working, which per-box TextFields break.
-class _CodeField extends StatelessWidget {
-  const _CodeField({
-    required this.controller,
-    required this.focusNode,
-    required this.length,
-    required this.hasError,
-    required this.enabled,
-    required this.onChanged,
-    required this.onCompleted,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final int length;
-  final bool hasError, enabled;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onCompleted;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Opacity(
-            opacity: 0,
-            child: TextField(
-              controller: controller,
-              focusNode: focusNode,
-              enabled: enabled,
-              autofillHints: const [AutofillHints.oneTimeCode],
-              keyboardType: TextInputType.number,
-              maxLength: length,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              onChanged: (v) {
-                onChanged(v);
-                if (v.length == length) onCompleted();
-              },
-              decoration: const InputDecoration(counterText: ''),
-            ),
-          ),
-        ),
-        GestureDetector(
-          onTap: enabled ? focusNode.requestFocus : null,
-          behavior: HitTestBehavior.opaque,
-          child: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (context, value, _) {
-              final code = value.text;
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(length, (i) {
-                  final filled = i < code.length;
-                  final active = i == code.length && focusNode.hasFocus;
-                  final border = hasError
-                      ? AppColors.danger
-                      : active
-                          ? AppColors.primary
-                          : filled
-                              ? AppColors.primary.withValues(alpha: 0.45)
-                              : context.borderColor;
-                  return Padding(
-                    padding: EdgeInsets.only(right: i == length - 1 ? 0 : 8),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 46,
-                      height: 58,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: enabled
-                            ? context.colors.surface
-                            : context.surfaceAlt,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: border, width: active ? 1.8 : 1.3),
-                      ),
-                      child: Text(
-                        filled ? code[i] : '',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: hasError ? AppColors.danger : context.colors.onSurface,
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              );
-            },
-          ),
         ),
       ],
     );

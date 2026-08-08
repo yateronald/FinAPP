@@ -180,22 +180,44 @@ export class AuthService {
     }
 
     if (!user.emailVerified && this.requireEmailVerification) {
-      // Only send when nothing usable is outstanding: re-sending on every
-      // attempt would spam the mailbox and invalidate a code the user is in
-      // the middle of typing.
-      const live = await this.activeOtp(user.id, OtpPurpose.EMAIL_VERIFICATION);
-      if (!live) {
-        await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION, {
-          firstName: user.firstName ?? undefined,
+      const grace = user.verificationDeadline;
+      const withinGrace = grace != null && grace.getTime() > Date.now();
+
+      if (!withinGrace) {
+        // Either a new account (no grace was ever granted) or one whose window
+        // has run out. Only send when nothing usable is outstanding: sending on
+        // every attempt would spam the mailbox and invalidate a code the user
+        // is in the middle of typing.
+        const live = await this.activeOtp(user.id, OtpPurpose.EMAIL_VERIFICATION);
+        if (!live) {
+          await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION, {
+            firstName: user.firstName ?? undefined,
+          });
+        }
+        await auditFailure('EMAIL_NOT_VERIFIED');
+        throw new ForbiddenException({
+          message: 'Please confirm your email address to continue.',
+          code: 'EMAIL_NOT_VERIFIED',
+          email: user.email,
+          codeSent: !live,
+          graceExpired: grace != null,
         });
       }
-      await auditFailure('EMAIL_NOT_VERIFIED');
-      throw new ForbiddenException({
-        message: 'Please confirm your email address to continue.',
-        code: 'EMAIL_NOT_VERIFIED',
-        email: user.email,
-        codeSent: !live,
-      });
+
+      // Accounts that predate the rule keep working for now; the app shows the
+      // countdown and the confirm action.
+      const session = await this.completeLogin(user.id, user.email, user.role, device);
+      return {
+        ...session,
+        verificationPending: {
+          email: user.email,
+          deadline: grace.toISOString(),
+          daysLeft: Math.max(
+            0,
+            Math.ceil((grace.getTime() - Date.now()) / (24 * 60 * 60 * 1000)),
+          ),
+        },
+      };
     }
 
     return this.completeLogin(user.id, user.email, user.role, device);
@@ -210,7 +232,12 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { emailVerified: true },
+      // Clearing the deadline stops the countdown reminders as well.
+      data: {
+        emailVerified: true,
+        verificationDeadline: null,
+        verificationRemindedAt: null,
+      },
     });
     await this.mail.sendWelcome(user.email, user.firstName ?? undefined);
     await this.audit.log({ userId: user.id, action: 'EMAIL_VERIFIED', entity: 'User', entityId: user.id });
@@ -259,20 +286,78 @@ export class AuthService {
   }
 
   // -------------------------------------------------------- Forgot / Reset PW
+  /**
+   * Sends a reset code, but only to an address that has been confirmed:
+   * resetting to an unverified mailbox would let whoever controls that inbox
+   * take over an account they never proved they own.
+   *
+   * The answer is identical in every case — account missing, unverified, or
+   * throttled — so this endpoint cannot be used to discover who has an
+   * account. The only visible difference is the 429, which needs a real
+   * countdown to be useful, and which reveals nothing on its own because an
+   * attacker can trigger it against any address.
+   */
   async forgotPassword(dto: ForgotPasswordDto) {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (user) {
-      const code = await this.issueOtp(user.id, user.email, OtpPurpose.PASSWORD_RESET, {
-          sendEmail: false,
-        });
-      await this.mail.sendPasswordReset(user.email, code);
+    const neutral = {
+      message:
+        'If this address has a confirmed account, a reset code is on its way.',
+      expiresInMinutes: this.config.get<number>('otp.expiresMinutes') ?? OTP_TTL_MINUTES,
+    };
+
+    const user = await this.prisma.user.findFirst({
+      where: { email: dto.email, deletedAt: null },
+    });
+    if (!user || !user.emailVerified || !user.isActive) return neutral;
+
+    const { remaining, retryAfter } = await this.resendAllowance(
+      user.id,
+      OtpPurpose.PASSWORD_RESET,
+    );
+    if (remaining === 0) {
+      throw new HttpException(
+        {
+          message: 'Too many codes requested. Please try again later.',
+          code: 'OTP_RESEND_LIMIT',
+          retryAfter,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
-    return { message: 'If an account exists, a reset code has been sent.' };
+
+    const code = await this.issueOtp(user.id, user.email, OtpPurpose.PASSWORD_RESET, {
+      sendEmail: false,
+      isResend: true,
+    });
+    const settings = await this.prisma.userSettings.findUnique({
+      where: { userId: user.id },
+      select: { language: true },
+    });
+    await this.mail.sendPasswordReset(user.email, code, {
+      firstName: user.firstName ?? undefined,
+      expiresMinutes: neutral.expiresInMinutes,
+      language: settings?.language,
+    });
+    await this.audit.log({
+      userId: user.id,
+      action: 'PASSWORD_RESET_REQUESTED',
+      entity: 'User',
+      entityId: user.id,
+    });
+    return neutral;
   }
 
   async resetPassword(dto: ResetPasswordDto) {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (!user) throw new BadRequestException('Invalid request');
+    const user = await this.prisma.user.findFirst({
+      where: { email: dto.email, deletedAt: null },
+    });
+    // Same guard as the request step: a code must never be redeemable against
+    // an account that was not eligible to receive one.
+    if (!user || !user.emailVerified || !user.isActive) {
+      throw new BadRequestException({
+        message: 'Invalid or expired reset request.',
+        code: 'OTP_NONE',
+      });
+    }
 
     await this.consumeOtp(user.id, dto.code, OtpPurpose.PASSWORD_RESET);
     const passwordHash = await this.tokens.hashPassword(dto.newPassword);
@@ -292,8 +377,11 @@ export class AuthService {
    *
    * An account created through Google has no passwordHash, so there is no
    * current password to confirm. Requiring one would leave those users unable
-   * to ever add a password. Setting one does NOT unlink Google: both sign-in
-   * methods keep working afterwards.
+   * to ever add a password.
+   *
+   * Setting a password RETIRES Google sign-in for that account: from then on
+   * the password is the only credential. The Google id is kept so the sign-in
+   * attempt can be answered with a useful message rather than "no account".
    */
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -425,6 +513,19 @@ export class AuthService {
       throw new UnauthorizedException({
         message: 'Account is disabled',
         code: 'ACCOUNT_DISABLED',
+      });
+    }
+
+    // Google is the way in only while the account has no password of its own.
+    // Once the user sets one, that password becomes the single credential:
+    // otherwise anyone holding the Google account keeps a second, silent key
+    // to an account its owner believes is protected by their password.
+    if (existing.passwordHash) {
+      throw new UnauthorizedException({
+        message:
+          'This account has a password. Please sign in with your email and password.',
+        code: 'ACCOUNT_HAS_PASSWORD',
+        email: existing.email,
       });
     }
 

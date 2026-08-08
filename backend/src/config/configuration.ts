@@ -44,9 +44,15 @@ export default () => ({
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER,
     password: process.env.SMTP_PASSWORD,
-    fromName: process.env.MAIL_FROM_NAME || 'FinApp',
+    fromName: process.env.MAIL_FROM_NAME || 'Fynexa',
     fromAddress: process.env.MAIL_FROM_ADDRESS || 'no-reply@finapp.local',
+    /// Shown in the e-mail footer. Falls back to the sending address so the
+    /// footer never advertises a mailbox nobody reads.
+    supportAddress:
+      process.env.MAIL_SUPPORT_ADDRESS || process.env.MAIL_FROM_ADDRESS,
   },
+  /// Public site, linked from e-mails. Blank hides the link entirely.
+  frontendUrl: process.env.FRONTEND_URL || '',
   otp: {
     expiresMinutes: parseInt(process.env.OTP_EXPIRES_MINUTES || '3', 10),
   },

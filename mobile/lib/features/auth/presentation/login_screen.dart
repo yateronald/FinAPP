@@ -6,8 +6,10 @@ import '../../../core/i18n/app_text.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../data/auth_repository.dart';
 import '../providers/auth_provider.dart';
 import 'auth_widgets.dart';
+import 'verification_prompt.dart';
 import 'google_auth_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -40,7 +42,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref
           .read(authProvider.notifier)
           .login(_email.text.trim(), _password.text);
-      if (mounted) context.go('/home');
+      if (mounted) {
+        context.go('/home');
+        final pending = AuthRepository.pendingVerification;
+        if (pending != null) {
+          AuthRepository.pendingVerification = null;
+          // After the navigation so the dialog belongs to the shell, not to a
+          // screen that is about to be disposed.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            showVerificationPrompt(context, ref,
+                email: pending.email, daysLeft: pending.daysLeft);
+          });
+        }
+      }
     } catch (e) {
       // If auth actually succeeded (token stored, state authenticated) but a
       // non-critical post-login step threw, don't show a misleading failure —
@@ -97,14 +112,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
     if (email == null || email.isEmpty) return;
+    var throttled = false;
     try {
       await ref.read(authRepositoryProvider).forgotPassword(email);
+    } on ApiException catch (e) {
+      // The only error worth surfacing: everything else answers the same way
+      // whether or not the address has an account, and saying more here would
+      // turn this screen into an account-enumeration oracle.
+      throttled = e.code == 'OTP_RESEND_LIMIT';
+      if (throttled && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.t.verifyResendLimit)),
+        );
+      }
     } catch (_) {}
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.t.forgotSent)));
-    }
+    if (!mounted || throttled) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(context.t.forgotSent)));
+    // Straight to the code screen: the code is only valid three minutes, so
+    // making the user find their own way there wastes most of the window.
+    context.push('/reset-password', extra: email);
   }
 
   Widget _methodChoice(AppText t) {

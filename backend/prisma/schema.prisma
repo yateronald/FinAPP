@@ -98,6 +98,17 @@ model User {
   avatarUrl         String?   @map("avatar_url")
   role              Role      @default(USER)
   emailVerified     Boolean   @default(false) @map("email_verified")
+
+  /// Deadline by which an unverified account must confirm its address.
+  ///
+  /// Only set for accounts that already existed when verification became
+  /// mandatory: they keep signing in, with a reminder, until this date. New
+  /// sign-ups leave it null and must confirm before their first session.
+  verificationDeadline DateTime? @map("verification_deadline")
+
+  /// Last time the countdown reminder went out, so it fires once a day.
+  verificationRemindedAt DateTime? @map("verification_reminded_at")
+
   googleId          String?   @unique @map("google_id")
   isActive          Boolean   @default(true) @map("is_active")
   lastLoginAt       DateTime? @map("last_login_at")

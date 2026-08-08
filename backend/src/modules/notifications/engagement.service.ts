@@ -3,13 +3,19 @@ import { Cron } from '@nestjs/schedule';
 import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
-import { expenseReminder, incomeReminder, welcomeMessage } from './engagement-copy';
+import {
+  expenseReminder,
+  incomeReminder,
+  verificationReminder,
+  welcomeMessage,
+} from './engagement-copy';
 
 /** Discriminates our notifications inside the generic SYSTEM type. */
 export const ENGAGEMENT_KINDS = {
   welcome: 'welcome',
   expenseReminder: 'expense_reminder',
   incomeReminder: 'income_reminder',
+  verification: 'verification_countdown',
 } as const;
 
 /**
@@ -211,5 +217,71 @@ export class EngagementService {
       metadata: { kind: ENGAGEMENT_KINDS.incomeReminder },
     });
     return true;
+  }
+
+  /**
+   * Once a day, remind accounts that predate mandatory verification how long
+   * they have left. Runs an hour after the inactivity sweep so the two never
+   * arrive together.
+   */
+  @Cron('0 20 * * *')
+  async handleVerificationReminders() {
+    const now = new Date();
+    const dayAgo = new Date(now.getTime() - 23 * 60 * 60 * 1000);
+
+    const pending = await this.prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        isActive: true,
+        emailVerified: false,
+        verificationDeadline: { gt: now },
+        // At most one a day, whatever else happens.
+        OR: [
+          { verificationRemindedAt: null },
+          { verificationRemindedAt: { lt: dayAgo } },
+        ],
+      },
+      select: {
+        id: true,
+        firstName: true,
+        verificationDeadline: true,
+        settings: { select: { language: true, notificationsEnabled: true } },
+      },
+      take: 500,
+    });
+
+    let sent = 0;
+    for (const user of pending) {
+      if (user.settings?.notificationsEnabled === false) continue;
+      const daysLeft = Math.max(
+        1,
+        Math.ceil((user.verificationDeadline!.getTime() - now.getTime()) / 86_400_000),
+      );
+      const copy = verificationReminder(
+        this.lang(user.settings?.language),
+        daysLeft,
+        user.firstName,
+      );
+      try {
+        await this.notifications.create({
+          userId: user.id,
+          type: NotificationType.SYSTEM,
+          title: copy.title,
+          message: copy.message,
+          metadata: { kind: ENGAGEMENT_KINDS.verification, daysLeft },
+        });
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { verificationRemindedAt: now },
+        });
+        sent++;
+      } catch (err) {
+        this.logger.error(
+          `Verification reminder failed for ${user.id}`,
+          (err as Error).message,
+        );
+      }
+    }
+    if (sent) this.logger.log(`Verification reminders sent: ${sent}`);
   }
 }

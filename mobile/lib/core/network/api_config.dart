@@ -12,7 +12,7 @@ class ApiConfig {
   static const _override = String.fromEnvironment('API_URL');
 
   /// Production API (TLS via Let's Encrypt).
-  static const _prodUrl = 'https://finance.learnfrenchwithnatives.com/api/v1';
+  static const _prodUrl = 'https://api.fynexa.in/api/v1';
 
   /// Dev machine's LAN address (same Wi-Fi as the phone).
   static const _lanUrl = 'http://192.168.100.8:4000/api/v1';

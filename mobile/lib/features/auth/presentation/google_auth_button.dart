@@ -75,6 +75,16 @@ class _GoogleAuthButtonState extends ConsumerState<GoogleAuthButton> {
             route: '/login',
           );
           break;
+        case 'ACCOUNT_HAS_PASSWORD':
+          // Setting a password retires Google on that account — say so rather
+          // than leaving the user tapping a button that will never work.
+          await _showRedirect(
+            title: context.t.googleHasPasswordTitle,
+            body: context.t.googleHasPasswordBody(e.email ?? ''),
+            cta: context.t.googleHasPasswordCta,
+            route: '/login',
+          );
+          break;
         case 'EMAIL_NOT_VERIFIED':
           // A Google sign-up confirms its address like any other account.
           if (mounted && e.email != null) context.push('/verify', extra: e.email);
