@@ -15,7 +15,19 @@ class ApiException implements Exception {
   /// Extra context some errors carry — currently the email involved.
   final String? email;
 
-  ApiException(this.message, [this.statusCode, this.code, this.email]);
+  /// Verification flow: guesses left on the current code, and how many seconds
+  /// until a throttled resend unlocks.
+  final int? attemptsLeft;
+  final int? retryAfter;
+
+  ApiException(
+    this.message, [
+    this.statusCode,
+    this.code,
+    this.email,
+    this.attemptsLeft,
+    this.retryAfter,
+  ]);
   @override
   String toString() => message;
 }
@@ -120,11 +132,22 @@ class ApiClient {
     // matching on the message.
     String? code;
     String? email;
+    int? attemptsLeft;
+    int? retryAfter;
     if (data is Map) {
       code = data['code'] as String?;
       email = data['email'] as String?;
+      attemptsLeft = (data['attemptsLeft'] as num?)?.toInt();
+      retryAfter = (data['retryAfter'] as num?)?.toInt();
     }
-    return ApiException(message, e.response?.statusCode, code, email);
+    return ApiException(
+      message,
+      e.response?.statusCode,
+      code,
+      email,
+      attemptsLeft,
+      retryAfter,
+    );
   }
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query, bool auth = true}) async {

@@ -4,6 +4,9 @@ import {
   ConflictException,
   Injectable,
   UnauthorizedException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Language, OtpPurpose, Prisma } from '@prisma/client';
@@ -26,6 +29,19 @@ import {
   ResetPasswordDto,
   VerifyOtpDto,
 } from './dto/auth.dto';
+
+/**
+ * Verification-code policy.
+ *
+ * Short-lived and few attempts because the code travels by e-mail and is only
+ * ever typed once: a wide window buys an attacker time without helping anyone.
+ */
+/** Minutes a code stays valid. */
+const OTP_TTL_MINUTES = 3;
+/** Wrong guesses before the code is burned and a new one must be requested. */
+const OTP_MAX_ATTEMPTS = 3;
+/** Explicit resends allowed within a rolling hour, per user and purpose. */
+const OTP_MAX_RESENDS_PER_HOUR = 3;
 
 @Injectable()
 export class AuthService {
@@ -113,7 +129,9 @@ export class AuthService {
       };
     }
 
-    await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION);
+    await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION, {
+      firstName: user.firstName ?? undefined,
+    });
     return {
       message: 'Registration successful. Please verify your email with the code we sent.',
       email: user.email,
@@ -162,10 +180,22 @@ export class AuthService {
     }
 
     if (!user.emailVerified && this.requireEmailVerification) {
-      await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION);
-      throw new UnauthorizedException(
-        'Email not verified. A new verification code has been sent.',
-      );
+      // Only send when nothing usable is outstanding: re-sending on every
+      // attempt would spam the mailbox and invalidate a code the user is in
+      // the middle of typing.
+      const live = await this.activeOtp(user.id, OtpPurpose.EMAIL_VERIFICATION);
+      if (!live) {
+        await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION, {
+          firstName: user.firstName ?? undefined,
+        });
+      }
+      await auditFailure('EMAIL_NOT_VERIFIED');
+      throw new ForbiddenException({
+        message: 'Please confirm your email address to continue.',
+        code: 'EMAIL_NOT_VERIFIED',
+        email: user.email,
+        codeSent: !live,
+      });
     }
 
     return this.completeLogin(user.id, user.email, user.role, device);
@@ -188,22 +218,53 @@ export class AuthService {
     return this.completeLogin(user.id, user.email, user.role, device);
   }
 
+  /**
+   * The response never reveals whether the address has an account — an
+   * unauthenticated caller must not be able to enumerate users — but a real,
+   * unverified account that has run out of resends gets a 429 so the app can
+   * show a truthful countdown rather than pretending a code is on its way.
+   */
   async resendOtp(email: string) {
     if (!this.requireEmailVerification) {
       return { message: 'Email verification is disabled — you can sign in directly.' };
     }
+    const generic = {
+      message: 'If the account exists and is unverified, a new code has been sent.',
+      expiresInMinutes: this.config.get<number>('otp.expiresMinutes') ?? OTP_TTL_MINUTES,
+    };
+
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (user && !user.emailVerified) {
-      await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION);
+    if (!user || user.emailVerified) return generic;
+
+    const { remaining, retryAfter } = await this.resendAllowance(
+      user.id,
+      OtpPurpose.EMAIL_VERIFICATION,
+    );
+    if (remaining === 0) {
+      throw new HttpException(
+        {
+          message: 'Too many codes requested. Please try again later.',
+          code: 'OTP_RESEND_LIMIT',
+          retryAfter,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
-    return { message: 'If the account exists and is unverified, a new code has been sent.' };
+
+    await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION, {
+      isResend: true,
+      firstName: user.firstName ?? undefined,
+    });
+    return { ...generic, resendsLeft: remaining - 1 };
   }
 
   // -------------------------------------------------------- Forgot / Reset PW
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (user) {
-      const code = await this.issueOtp(user.id, user.email, OtpPurpose.PASSWORD_RESET, false);
+      const code = await this.issueOtp(user.id, user.email, OtpPurpose.PASSWORD_RESET, {
+          sendEmail: false,
+        });
       await this.mail.sendPasswordReset(user.email, code);
     }
     return { message: 'If an account exists, a reset code has been sent.' };
@@ -332,8 +393,9 @@ export class AuthService {
           firstName: profile.firstName,
           lastName: profile.lastName,
           avatarUrl: profile.avatarUrl,
-          // Google already proved ownership of the mailbox.
-          emailVerified: true,
+          // Google has proved the mailbox, but every account confirms its
+          // address through our own code before a session is issued.
+          emailVerified: false,
           // Signing up through Google still requires acceptance — the client
           // shows the same consent step before calling with intent=signup.
           termsAcceptedAt: new Date(),
@@ -371,7 +433,6 @@ export class AuthService {
     const patch: Record<string, unknown> = {};
     if (!existing.googleId) {
       patch.googleId = profile.googleId;
-      patch.emailVerified = true;
     }
     if (!existing.firstName && profile.firstName) patch.firstName = profile.firstName;
     if (!existing.lastName && profile.lastName) patch.lastName = profile.lastName;
@@ -406,6 +467,29 @@ export class AuthService {
         'Admin accounts must sign in on the web dashboard.',
       );
     }
+
+    // Google sign-ups go through the same confirmation as everyone else.
+    if (this.requireEmailVerification) {
+      const account = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { emailVerified: true, firstName: true },
+      });
+      if (account && !account.emailVerified) {
+        const live = await this.activeOtp(userId, OtpPurpose.EMAIL_VERIFICATION);
+        if (!live) {
+          await this.issueOtp(userId, email, OtpPurpose.EMAIL_VERIFICATION, {
+            firstName: account.firstName ?? undefined,
+          });
+        }
+        throw new ForbiddenException({
+          message: 'Please confirm your email address to continue.',
+          code: 'EMAIL_NOT_VERIFIED',
+          email,
+          codeSent: !live,
+        });
+      }
+    }
+
     return this.completeLogin(userId, email, role, device);
   }
 
@@ -547,13 +631,15 @@ export class AuthService {
     userId: string,
     email: string,
     purpose: OtpPurpose,
-    sendEmail = true,
+    opts: { sendEmail?: boolean; isResend?: boolean; firstName?: string } = {},
   ): Promise<string> {
+    const { sendEmail = true, isResend = false, firstName } = opts;
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const codeHash = await argon2.hash(code, { type: argon2.argon2id });
-    const expiresMinutes = this.config.get<number>('otp.expiresMinutes') ?? 10;
+    const ttl = this.config.get<number>('otp.expiresMinutes') ?? OTP_TTL_MINUTES;
 
-    // Invalidate previous unconsumed OTPs of the same purpose.
+    // Invalidate previous unconsumed OTPs of the same purpose: only the newest
+    // code may ever be used.
     await this.prisma.otpCode.updateMany({
       where: { userId, purpose, consumedAt: null },
       data: { consumedAt: new Date() },
@@ -564,33 +650,105 @@ export class AuthService {
         userId,
         codeHash,
         purpose,
-        expiresAt: new Date(Date.now() + expiresMinutes * 60 * 1000),
+        isResend,
+        expiresAt: new Date(Date.now() + ttl * 60 * 1000),
       },
     });
 
     if (sendEmail) {
-      await this.mail.sendOtp(email, code, purpose);
+      // The code e-mail follows the account's own language, not the language
+      // of whichever device happened to trigger it.
+      const settings = await this.prisma.userSettings.findUnique({
+        where: { userId },
+        select: { language: true },
+      });
+      await this.mail.sendOtp(email, code, purpose, {
+        firstName,
+        expiresMinutes: ttl,
+        language: settings?.language,
+      });
     }
     return code;
   }
 
+  /** Live (unconsumed, unexpired) code for this purpose, if any. */
+  private activeOtp(userId: string, purpose: OtpPurpose) {
+    return this.prisma.otpCode.findFirst({
+      where: { userId, purpose, consumedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * How many explicit resends are left in the rolling hour, and when the
+   * oldest one falls out of the window.
+   */
+  private async resendAllowance(userId: string, purpose: OtpPurpose) {
+    const since = new Date(Date.now() - 60 * 60 * 1000);
+    const sends = await this.prisma.otpCode.findMany({
+      where: { userId, purpose, isResend: true, createdAt: { gte: since } },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    });
+    const remaining = Math.max(0, OTP_MAX_RESENDS_PER_HOUR - sends.length);
+    const retryAfter =
+      remaining > 0 || sends.length === 0
+        ? 0
+        : Math.max(
+            1,
+            Math.ceil((sends[0].createdAt.getTime() + 60 * 60 * 1000 - Date.now()) / 1000),
+          );
+    return { remaining, retryAfter };
+  }
+
+  /**
+   * Checks a code and burns it on the third wrong guess, so a stolen or
+   * brute-forced code cannot be retried indefinitely — the user must ask for a
+   * new one. Errors carry a machine-readable `code` and the attempts left so
+   * the client can guide the user instead of guessing at the message.
+   */
   private async consumeOtp(userId: string, code: string, purpose: OtpPurpose) {
     const otp = await this.prisma.otpCode.findFirst({
       where: { userId, purpose, consumedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!otp) throw new BadRequestException('No active code. Please request a new one.');
-    if (otp.expiresAt < new Date()) throw new BadRequestException('Code has expired');
-    if (otp.attempts >= 5) throw new BadRequestException('Too many attempts. Request a new code.');
+    if (!otp) {
+      throw new BadRequestException({
+        message: 'No active code. Please request a new one.',
+        code: 'OTP_NONE',
+      });
+    }
+    if (otp.expiresAt < new Date()) {
+      throw new BadRequestException({
+        message: 'This code has expired. Please request a new one.',
+        code: 'OTP_EXPIRED',
+      });
+    }
 
     const valid = await argon2.verify(otp.codeHash, code).catch(() => false);
     if (!valid) {
+      const attempts = otp.attempts + 1;
+      const exhausted = attempts >= OTP_MAX_ATTEMPTS;
       await this.prisma.otpCode.update({
         where: { id: otp.id },
-        data: { attempts: { increment: 1 } },
+        // Burning the code on exhaustion is what makes the attempt cap real:
+        // leaving it active would let the caller keep guessing forever.
+        data: { attempts, ...(exhausted ? { consumedAt: new Date() } : {}) },
       });
-      throw new BadRequestException('Invalid code');
+      throw new BadRequestException(
+        exhausted
+          ? {
+              message: 'Too many incorrect attempts. This code is no longer valid — request a new one.',
+              code: 'OTP_LOCKED',
+              attemptsLeft: 0,
+            }
+          : {
+              message: 'Incorrect code.',
+              code: 'OTP_INVALID',
+              attemptsLeft: OTP_MAX_ATTEMPTS - attempts,
+            },
+      );
     }
 
     await this.prisma.otpCode.update({

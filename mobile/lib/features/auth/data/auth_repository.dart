@@ -76,8 +76,17 @@ class AuthRepository {
     return AppUser.fromJson(Map<String, dynamic>.from(data['user']));
   }
 
-  Future<void> resendOtp(String email) =>
-      _api.post('/auth/resend-otp', body: {'email': email}, auth: false);
+  /// Returns how many resends remain in the current hour, when the server
+  /// says — null when it does not (e.g. the address has no pending account,
+  /// which the response deliberately does not reveal).
+  Future<int?> resendOtp(String email) async {
+    final data =
+        await _api.post('/auth/resend-otp', body: {'email': email}, auth: false);
+    if (data is Map && data['resendsLeft'] != null) {
+      return (data['resendsLeft'] as num).toInt();
+    }
+    return null;
+  }
 
   Future<void> forgotPassword(String email) =>
       _api.post('/auth/forgot-password', body: {'email': email}, auth: false);

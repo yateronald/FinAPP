@@ -29,6 +29,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // linked. Never anything sensitive.
     let email: string | undefined;
     let hasGoogle: boolean | undefined;
+    // Verification-flow context: how many guesses remain, when a throttled
+    // resend unlocks, and whether a fresh code was just sent.
+    let attemptsLeft: number | undefined;
+    let retryAfter: number | undefined;
+    let codeSent: boolean | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -41,6 +46,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         code = (res as any).code;
         email = (res as any).email;
         hasGoogle = (res as any).hasGoogle;
+        attemptsLeft = (res as any).attemptsLeft;
+        retryAfter = (res as any).retryAfter;
+        codeSent = (res as any).codeSent;
       }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       const mapped = this.mapPrismaError(exception);
@@ -66,6 +74,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ...(code ? { code } : {}),
       ...(email ? { email } : {}),
       ...(hasGoogle !== undefined ? { hasGoogle } : {}),
+      ...(attemptsLeft !== undefined ? { attemptsLeft } : {}),
+      ...(retryAfter !== undefined ? { retryAfter } : {}),
+      ...(codeSent !== undefined ? { codeSent } : {}),
       path: request.url,
       timestamp: new Date().toISOString(),
     });

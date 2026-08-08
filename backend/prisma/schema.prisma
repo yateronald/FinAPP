@@ -193,11 +193,19 @@ model OtpCode {
   expiresAt   DateTime   @map("expires_at")
   consumedAt  DateTime?  @map("consumed_at")
   attempts    Int        @default(0)
+
+  /// True when the user explicitly asked for another code. The hourly resend
+  /// quota counts only these, so the automatic code sent at sign-up never eats
+  /// into the allowance.
+  isResend    Boolean    @default(false) @map("is_resend")
+
   createdAt   DateTime   @default(now()) @map("created_at")
 
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, purpose])
+  /// Serves the rolling-window resend count.
+  @@index([userId, purpose, createdAt])
   @@map("otp_codes")
 }
 

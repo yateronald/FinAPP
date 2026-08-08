@@ -48,7 +48,7 @@ export default () => ({
     fromAddress: process.env.MAIL_FROM_ADDRESS || 'no-reply@finapp.local',
   },
   otp: {
-    expiresMinutes: parseInt(process.env.OTP_EXPIRES_MINUTES || '10', 10),
+    expiresMinutes: parseInt(process.env.OTP_EXPIRES_MINUTES || '3', 10),
   },
   auth: {
     // Unset = follow SMTP: with no mail server the OTP can never reach the

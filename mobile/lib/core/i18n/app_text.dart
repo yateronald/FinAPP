@@ -311,6 +311,51 @@ class AppText {
   String get verifyResend => _s('Renvoyer le code', 'Resend code');
   String get verify => _s('Vérifier', 'Verify');
 
+  // Verification screen
+  String get verifyHeadline =>
+      _s('Confirmez votre adresse', 'Confirm your address');
+  String get verifyIntro => _s(
+    'Nous avons envoyé un code à 6 chiffres à',
+    'We sent a 6-digit code to',
+  );
+  String get verifyCheckSpam => _s(
+    'Pensez à vérifier vos courriers indésirables.',
+    'Remember to check your spam folder.',
+  );
+  String verifyExpiresIn(String mmss) =>
+      _s('Expire dans $mmss', 'Expires in $mmss');
+  String get verifyExpired =>
+      _s('Ce code a expiré', 'This code has expired');
+  String verifyAttemptsLeft(int n) => _s(
+    n > 1 ? '$n tentatives restantes' : 'Dernière tentative',
+    n > 1 ? '$n attempts left' : 'Last attempt',
+  );
+  String get verifyLocked => _s(
+    'Trop de tentatives. Demandez un nouveau code.',
+    'Too many attempts. Request a new code.',
+  );
+  String get verifyWrongCode => _s('Code incorrect', 'Incorrect code');
+  String get verifyNoCode =>
+      _s('Aucun code actif. Renvoyez-en un.', 'No active code. Request a new one.');
+  String verifyResendIn(String mmss) =>
+      _s('Renvoyer dans $mmss', 'Resend in $mmss');
+  String verifyResendsLeft(int n) => _s(
+    n > 1 ? '$n renvois restants cette heure' : '1 renvoi restant cette heure',
+    n > 1 ? '$n resends left this hour' : '1 resend left this hour',
+  );
+  String get verifyResendLimit => _s(
+    'Limite de renvois atteinte. Réessayez plus tard.',
+    'Resend limit reached. Try again later.',
+  );
+  String get verifyCodeSent =>
+      _s('Nouveau code envoyé', 'New code sent');
+  String get verifySuccess =>
+      _s('Adresse confirmée', 'Address confirmed');
+  String get verifyWrongAddress =>
+      _s('Ce n’est pas votre adresse ?', 'Not your address?');
+  String get verifyChangeAccount =>
+      _s('Utiliser un autre compte', 'Use another account');
+
   // ---------------------------------------------------- App lock
   String get lockTitle => _s('Application verrouillée', 'App locked');
   String get lockSubtitle => _s(

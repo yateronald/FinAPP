@@ -47,6 +47,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // just proceed to home.
       if (ref.read(authProvider).status == AuthStatus.authenticated) {
         if (mounted) context.go('/home');
+      } else if (e is ApiException && e.code == 'EMAIL_NOT_VERIFIED') {
+        // The account exists and the password was right — it simply has not
+        // confirmed its address yet, and the server already sent a code.
+        if (mounted) context.push('/verify', extra: e.email ?? _email.text.trim());
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

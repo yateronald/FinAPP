@@ -75,6 +75,10 @@ class _GoogleAuthButtonState extends ConsumerState<GoogleAuthButton> {
             route: '/login',
           );
           break;
+        case 'EMAIL_NOT_VERIFIED':
+          // A Google sign-up confirms its address like any other account.
+          if (mounted && e.email != null) context.push('/verify', extra: e.email);
+          break;
         case 'GOOGLE_EMAIL_UNVERIFIED':
           _snack(context.t.googleEmailUnverified);
           break;
