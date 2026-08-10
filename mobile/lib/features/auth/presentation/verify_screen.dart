@@ -22,7 +22,16 @@ import 'otp_code_field.dart';
 /// nothing here is a security control, it is feedback.
 class VerifyScreen extends ConsumerStatefulWidget {
   final String email;
-  const VerifyScreen({super.key, required this.email});
+
+  /// Code lifetime, as reported by the server. Defaults to the current policy
+  /// so a caller that has no value still shows a truthful countdown.
+  final int expiresInMinutes;
+
+  const VerifyScreen({
+    super.key,
+    required this.email,
+    this.expiresInMinutes = 3,
+  });
 
   @override
   ConsumerState<VerifyScreen> createState() => _VerifyScreenState();
@@ -30,7 +39,7 @@ class VerifyScreen extends ConsumerStatefulWidget {
 
 class _VerifyScreenState extends ConsumerState<VerifyScreen> {
   static const _codeLength = 6;
-  static const _ttl = Duration(minutes: 3);
+  late final Duration _ttl = Duration(minutes: widget.expiresInMinutes);
   /// Matches the server's cool-down between explicit resends.
   static const _resendCooldown = Duration(seconds: 45);
 
@@ -38,7 +47,7 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
   final _focus = FocusNode();
 
   Timer? _ticker;
-  Duration _left = _ttl;
+  late Duration _left = _ttl;
   Duration _resendIn = _resendCooldown;
 
   bool _loading = false;

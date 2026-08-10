@@ -82,6 +82,13 @@ export class AuthService {
   }
 
   // ---------------------------------------------------------------- Register
+  /**
+   * Stages the sign-up; nothing reaches `users` until the code is validated.
+   *
+   * The old flow created the account first, so a code that was never entered
+   * left a real account behind and the address answered "already exists"
+   * forever — with no way for the rightful owner to claim it.
+   */
   async register(dto: RegisterDto, device: DeviceContext) {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
@@ -89,50 +96,20 @@ export class AuthService {
     }
 
     const passwordHash = await this.tokens.hashPassword(dto.password);
-    const needsVerification = this.requireEmailVerification;
 
-    const user = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.user.create({
-        data: {
-          email: dto.email,
-          passwordHash,
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          country: dto.country,
-          emailVerified: !needsVerification,
-          // Proof of consent, recorded at the moment of acceptance.
-          termsAcceptedAt: new Date(),
-          termsVersion: TERMS_VERSION,
-          privacyVersion: PRIVACY_VERSION,
-          settings: {
-            create: {
-              language: dto.language ?? Language.EN,
-              currency:
-                dto.currency ?? this.config.get<string>('defaultCurrency') ?? 'XOF',
-              // AI is always opt-in. Enabling it requires the dedicated
-              // disclosure and consent endpoint after the first welcome.
-              aiEnabled: false,
-            },
-          },
-          categories: {
-            create: ALL_DEFAULT_CATEGORIES.map((c, index) => ({
-              name: c.name,
-              type: c.type,
-              icon: c.icon,
-              color: c.color,
-              isDefault: true,
-              sortOrder: index,
-            })),
-          },
-        },
+    if (!this.requireEmailVerification) {
+      // No mail can leave the server, so there is no code to wait for: create
+      // the account directly rather than stranding the user.
+      const user = await this.createVerifiedUser({
+        email: dto.email,
+        passwordHash,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        country: dto.country,
+        language: dto.language ?? Language.EN,
+        currency: dto.currency ?? this.config.get<string>('defaultCurrency') ?? 'XOF',
       });
-      return created;
-    });
-
-    await this.audit.log({ userId: user.id, action: 'REGISTER', entity: 'User', entityId: user.id, ...device });
-
-    if (!needsVerification) {
-      // No mail to wait for — hand back a session so the app signs straight in.
+      await this.audit.log({ userId: user.id, action: 'REGISTER', entity: 'User', entityId: user.id, ...device });
       return {
         message: 'Registration successful.',
         email: user.email,
@@ -141,14 +118,114 @@ export class AuthService {
       };
     }
 
-    await this.issueOtp(user.id, user.email, OtpPurpose.EMAIL_VERIFICATION, {
-      firstName: user.firstName ?? undefined,
+    const { code, expiresAt } = await this.freshCode();
+    // Re-registering the same address simply replaces the pending row: the new
+    // code goes to the mailbox, so only its real owner can complete it.
+    await this.prisma.pendingSignup.upsert({
+      where: { email: dto.email },
+      create: {
+        email: dto.email,
+        passwordHash,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        country: dto.country,
+        language: dto.language ?? Language.EN,
+        currency: dto.currency ?? this.config.get<string>('defaultCurrency') ?? 'XOF',
+        codeHash: await argon2.hash(code, { type: argon2.argon2id }),
+        expiresAt,
+      },
+      update: {
+        passwordHash,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        country: dto.country,
+        codeHash: await argon2.hash(code, { type: argon2.argon2id }),
+        expiresAt,
+        attempts: 0,
+      },
     });
+
+    // Not awaited: the caller should reach the code screen immediately rather
+    // than wait on the mail server. A failure is logged, and the resend button
+    // on that screen does await, so a broken mailer still surfaces there.
+    void this.mail
+      .sendOtp(dto.email, code, OtpPurpose.EMAIL_VERIFICATION, {
+        firstName: dto.firstName,
+        expiresMinutes: this.config.get<number>('otp.expiresMinutes') ?? OTP_TTL_MINUTES,
+        language: dto.language ?? undefined,
+      })
+      .catch((err) =>
+        this.logger.error(
+          `Sign-up code could not be sent to ${dto.email}`,
+          (err as Error).message,
+        ),
+      );
+
     return {
-      message: 'Registration successful. Please verify your email with the code we sent.',
-      email: user.email,
+      message: 'Please confirm your email with the code we just sent.',
+      email: dto.email,
       requiresVerification: true,
+      expiresInMinutes: this.config.get<number>('otp.expiresMinutes') ?? OTP_TTL_MINUTES,
     };
+  }
+
+  /** A six-digit code and the instant it stops being valid. */
+  private async freshCode() {
+    const ttl = this.config.get<number>('otp.expiresMinutes') ?? OTP_TTL_MINUTES;
+    return {
+      code: randomInt(0, 1_000_000).toString().padStart(6, '0'),
+      expiresAt: new Date(Date.now() + ttl * 60 * 1000),
+    };
+  }
+
+  /**
+   * Creates the real account — settings, default categories and the consent
+   * record — once ownership of the address is proven.
+   */
+  private createVerifiedUser(input: {
+    email: string;
+    passwordHash?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    country?: string | null;
+    language: Language;
+    currency: string;
+    googleId?: string | null;
+    avatarUrl?: string | null;
+  }) {
+    return this.prisma.user.create({
+      data: {
+        email: input.email,
+        passwordHash: input.passwordHash ?? undefined,
+        firstName: input.firstName ?? undefined,
+        lastName: input.lastName ?? undefined,
+        country: input.country ?? undefined,
+        googleId: input.googleId ?? undefined,
+        avatarUrl: input.avatarUrl ?? undefined,
+        emailVerified: true,
+        termsAcceptedAt: new Date(),
+        termsVersion: TERMS_VERSION,
+        privacyVersion: PRIVACY_VERSION,
+        settings: {
+          create: {
+            language: input.language,
+            currency: input.currency,
+            // AI stays opt-in: enabling it requires the dedicated disclosure.
+            aiEnabled: false,
+          },
+        },
+        categories: {
+          create: ALL_DEFAULT_CATEGORIES.map((c, index) => ({
+            name: c.name,
+            type: c.type,
+            icon: c.icon,
+            color: c.color,
+            isDefault: true,
+            sortOrder: index,
+          })),
+        },
+      },
+    });
   }
 
   /**
@@ -299,7 +376,75 @@ export class AuthService {
   }
 
   // -------------------------------------------------------------- Verify OTP
+  /**
+   * Validates the code and, for a staged sign-up, creates the account.
+   *
+   * Two paths share this endpoint: a pending sign-up (nothing in `users` yet)
+   * and a legacy account that predates staged registration.
+   */
   async verifyEmail(dto: VerifyOtpDto, device: DeviceContext) {
+    const pending = await this.prisma.pendingSignup.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (pending) {
+      if (pending.expiresAt < new Date()) {
+        throw new BadRequestException({
+          message: 'This code has expired. Please request a new one.',
+          code: 'OTP_EXPIRED',
+        });
+      }
+
+      const ok = await argon2.verify(pending.codeHash, dto.code).catch(() => false);
+      if (!ok) {
+        const attempts = pending.attempts + 1;
+        if (attempts >= OTP_MAX_ATTEMPTS) {
+          // Burn the staged sign-up rather than let it be guessed at forever.
+          await this.prisma.pendingSignup.delete({ where: { id: pending.id } });
+          throw new BadRequestException({
+            message:
+              'Too many incorrect attempts. Please start the sign-up again.',
+            code: 'OTP_LOCKED',
+            attemptsLeft: 0,
+          });
+        }
+        await this.prisma.pendingSignup.update({
+          where: { id: pending.id },
+          data: { attempts },
+        });
+        throw new BadRequestException({
+          message: 'Incorrect code.',
+          code: 'OTP_INVALID',
+          attemptsLeft: OTP_MAX_ATTEMPTS - attempts,
+        });
+      }
+
+      // Proven. Create the account, then drop the staging row.
+      const created = await this.createVerifiedUser({
+        email: pending.email,
+        passwordHash: pending.passwordHash,
+        firstName: pending.firstName,
+        lastName: pending.lastName,
+        country: pending.country,
+        language: pending.language,
+        currency: pending.currency,
+        googleId: pending.googleId,
+        avatarUrl: pending.avatarUrl,
+      });
+      await this.prisma.pendingSignup.delete({ where: { id: pending.id } });
+
+      await this.audit.log({
+        userId: created.id,
+        action: 'REGISTER',
+        entity: 'User',
+        entityId: created.id,
+        ...device,
+      });
+      await this.mail.sendWelcome(created.email, created.firstName ?? undefined);
+      return this.completeLogin(created.id, created.email, created.role, device);
+    }
+
+    // Legacy path: an account that already exists and is confirming late.
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) throw new BadRequestException('Invalid request');
 
@@ -334,6 +479,51 @@ export class AuthService {
       message: 'If the account exists and is unverified, a new code has been sent.',
       expiresInMinutes: this.config.get<number>('otp.expiresMinutes') ?? OTP_TTL_MINUTES,
     };
+
+    // A staged sign-up has no user row yet, so its quota lives on its own
+    // record rather than on OtpCode.
+    const pending = await this.prisma.pendingSignup.findUnique({ where: { email } });
+    if (pending) {
+      const now = new Date();
+      const windowOpen =
+        pending.resendWindowStart != null &&
+        now.getTime() - pending.resendWindowStart.getTime() < 60 * 60 * 1000;
+      const used = windowOpen ? pending.resendCount : 0;
+
+      if (used >= OTP_MAX_RESENDS_PER_HOUR) {
+        throw new HttpException(
+          {
+            message: 'Too many codes requested. Please try again later.',
+            code: 'OTP_RESEND_LIMIT',
+            retryAfter: Math.max(
+              1,
+              Math.ceil(
+                (pending.resendWindowStart!.getTime() + 3_600_000 - now.getTime()) / 1000,
+              ),
+            ),
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      const { code, expiresAt } = await this.freshCode();
+      await this.prisma.pendingSignup.update({
+        where: { id: pending.id },
+        data: {
+          codeHash: await argon2.hash(code, { type: argon2.argon2id }),
+          expiresAt,
+          attempts: 0,
+          resendCount: used + 1,
+          resendWindowStart: windowOpen ? pending.resendWindowStart : now,
+        },
+      });
+      await this.mail.sendOtp(email, code, OtpPurpose.EMAIL_VERIFICATION, {
+        firstName: pending.firstName ?? undefined,
+        expiresMinutes: generic.expiresInMinutes,
+        language: pending.language,
+      });
+      return { ...generic, resendsLeft: OTP_MAX_RESENDS_PER_HOUR - (used + 1) };
+    }
 
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user || user.emailVerified) return generic;
@@ -551,38 +741,61 @@ export class AuthService {
     }
 
     if (!existing) {
-      return this.prisma.user.create({
-        data: {
+      // A Google sign-up is staged like any other: nothing lands in `users`
+      // until the code proves the mailbox. Google asserts the address, but an
+      // abandoned flow must not leave an account squatting it.
+      if (this.requireEmailVerification) {
+        const { code, expiresAt } = await this.freshCode();
+        await this.prisma.pendingSignup.upsert({
+          where: { email: profile.email },
+          create: {
+            email: profile.email,
+            googleId: profile.googleId,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            avatarUrl: profile.avatarUrl,
+            currency: this.config.get<string>('defaultCurrency') ?? 'XOF',
+            codeHash: await argon2.hash(code, { type: argon2.argon2id }),
+            expiresAt,
+          },
+          update: {
+            googleId: profile.googleId,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            avatarUrl: profile.avatarUrl,
+            codeHash: await argon2.hash(code, { type: argon2.argon2id }),
+            expiresAt,
+            attempts: 0,
+          },
+        });
+        void this.mail
+          .sendOtp(profile.email, code, OtpPurpose.EMAIL_VERIFICATION, {
+            firstName: profile.firstName,
+            expiresMinutes: this.config.get<number>('otp.expiresMinutes') ?? OTP_TTL_MINUTES,
+          })
+          .catch((err) =>
+            this.logger.error(
+              `Sign-up code could not be sent to ${profile.email}`,
+              (err as Error).message,
+            ),
+          );
+        throw new ForbiddenException({
+          message: 'Please confirm your email address to finish signing up.',
+          code: 'EMAIL_NOT_VERIFIED',
           email: profile.email,
-          googleId: profile.googleId,
-          firstName: profile.firstName,
-          lastName: profile.lastName,
-          avatarUrl: profile.avatarUrl,
-          // Google has proved the mailbox, but every account confirms its
-          // address through our own code before a session is issued.
-          emailVerified: false,
-          // Signing up through Google still requires acceptance — the client
-          // shows the same consent step before calling with intent=signup.
-          termsAcceptedAt: new Date(),
-          termsVersion: TERMS_VERSION,
-          privacyVersion: PRIVACY_VERSION,
-          settings: {
-            create: {
-              currency: this.config.get<string>('defaultCurrency') ?? 'XOF',
-              aiEnabled: false,
-            },
-          },
-          categories: {
-            create: ALL_DEFAULT_CATEGORIES.map((c, index) => ({
-              name: c.name,
-              type: c.type,
-              icon: c.icon,
-              color: c.color,
-              isDefault: true,
-              sortOrder: index,
-            })),
-          },
-        },
+          codeSent: true,
+        });
+      }
+
+      // Verification disabled (no mail can leave the server): create directly.
+      return this.createVerifiedUser({
+        email: profile.email,
+        googleId: profile.googleId,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        avatarUrl: profile.avatarUrl,
+        language: Language.EN,
+        currency: this.config.get<string>('defaultCurrency') ?? 'XOF',
       });
     }
 

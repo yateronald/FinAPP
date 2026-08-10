@@ -535,3 +535,44 @@ model FcmToken {
   @@index([userId])
   @@map("fcm_tokens")
 }
+
+// --------------------------------------------------------------------------
+// Staged sign-ups
+// --------------------------------------------------------------------------
+
+/// A sign-up waiting for its e-mail code.
+///
+/// Nothing lands in `users` until the code is validated. Abandoning the flow
+/// therefore leaves no account behind, and the address stays free to try
+/// again — the previous design created the user up front, so a failed code
+/// permanently answered "this account already exists".
+model PendingSignup {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  /// Null for a Google sign-up, which carries no password.
+  passwordHash  String?   @map("password_hash")
+  firstName     String?   @map("first_name")
+  lastName      String?   @map("last_name")
+  country       String?
+  language      Language  @default(EN)
+  currency      String    @default("XOF")
+
+  /// Set when the sign-up came through Google, so the identity survives the
+  /// verification step.
+  googleId      String?   @map("google_id")
+  avatarUrl     String?   @map("avatar_url")
+
+  codeHash      String    @map("code_hash")
+  expiresAt     DateTime  @map("expires_at")
+  attempts      Int       @default(0)
+
+  /// Rolling hourly resend quota, tracked here because no user row exists yet
+  /// to hang OtpCode records off.
+  resendCount       Int       @default(0) @map("resend_count")
+  resendWindowStart DateTime? @map("resend_window_start")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("pending_signups")
+}

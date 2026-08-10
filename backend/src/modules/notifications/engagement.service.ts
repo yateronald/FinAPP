@@ -284,4 +284,17 @@ export class EngagementService {
     }
     if (sent) this.logger.log(`Verification reminders sent: ${sent}`);
   }
+
+  /**
+   * Drops staged sign-ups whose code has long expired. Without this the table
+   * accumulates a row per abandoned attempt, each holding a password hash.
+   */
+  @Cron('30 3 * * *')
+  async purgeExpiredSignups() {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const { count } = await this.prisma.pendingSignup.deleteMany({
+      where: { expiresAt: { lt: cutoff } },
+    });
+    if (count) this.logger.log(`Purged ${count} abandoned sign-up(s)`);
+  }
 }

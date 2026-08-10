@@ -52,7 +52,18 @@ class OtpCodeField extends StatelessWidget {
           ),
         ),
         GestureDetector(
-          onTap: enabled ? focusNode.requestFocus : null,
+          // Dismissing the keyboard (back gesture, "done") does NOT clear the
+          // focus, so requestFocus on an already-focused node is a no-op and
+          // the keyboard never comes back. Ask the platform directly instead.
+          onTap: enabled
+              ? () {
+                  if (focusNode.hasFocus) {
+                    SystemChannels.textInput.invokeMethod('TextInput.show');
+                  } else {
+                    focusNode.requestFocus();
+                  }
+                }
+              : null,
           behavior: HitTestBehavior.opaque,
           child: ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,

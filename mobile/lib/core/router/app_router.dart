@@ -44,7 +44,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/verify',
-        builder: (_, state) => VerifyScreen(email: state.extra as String? ?? ''),
+        builder: (_, state) {
+          // Callers pass either the address alone or a map carrying the
+          // server-reported code lifetime.
+          final extra = state.extra;
+          if (extra is Map) {
+            return VerifyScreen(
+              email: (extra['email'] ?? '') as String,
+              expiresInMinutes: (extra['expiresInMinutes'] as num?)?.toInt() ?? 3,
+            );
+          }
+          return VerifyScreen(email: extra as String? ?? '');
+        },
       ),
       GoRoute(path: '/home', builder: (_, __) => const MainShell()),
       GoRoute(
