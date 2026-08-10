@@ -309,15 +309,9 @@ class AppText {
   String get signInFailed => _s('Connexion impossible', 'Sign-in failed');
   String get rememberMe => _s('Se souvenir de moi', 'Remember me');
   String get forgotPassword => _s('Mot de passe oublié ?', 'Forgot password?');
-  String get forgotTitle => _s('Mot de passe oublié', 'Forgot password');
-  String get forgotBody => _s(
-    'Entrez votre email pour recevoir un code de réinitialisation.',
-    'Enter your email to receive a reset code.',
-  );
-  String get forgotSent => _s(
-    'Si ce compte existe, un code a été envoyé par email.',
-    'If the account exists, a code has been sent by email.',
-  );
+  // The old forgotTitle/forgotBody/forgotSent strings lived on an earlier
+  // screen and a snackbar that the dialog replaced; the dialog now carries the
+  // whole flow (see forgotDialogTitle and forgotSentBody below).
   String get continueWith => _s('ou continuer avec', 'or continue with');
   String get continueWithGoogle =>
       _s('Continuer avec Google', 'Continue with Google');

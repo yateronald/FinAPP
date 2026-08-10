@@ -130,13 +130,17 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       !_locked;
 
   Future<void> _changeEmail() async {
-    final next = await showForgotPasswordDialog(context, initialEmail: _email);
+    // The dialog sends the new code itself and only resolves once it is away,
+    // so this screen retargets against a request that has already happened —
+    // no second send, and no silent gap after the dialog closes.
+    final next = await showForgotPasswordDialog(
+      context,
+      initialEmail: _email,
+      onSubmit: (address) => sendResetCode(
+        () => ref.read(authRepositoryProvider).forgotPassword(address),
+      ),
+    );
     if (next == null || next.isEmpty || next == _email) return;
-    try {
-      await ref.read(authRepositoryProvider).forgotPassword(next);
-    } catch (_) {
-      // The neutral answer is the same either way; the screen just retargets.
-    }
     if (!mounted) return;
     setState(() {
       _email = next;

@@ -108,29 +108,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _forgotPassword() async {
+    // The send happens inside the dialog, so the user watches one continuous
+    // flow — form, spinner, confirmation — instead of the dialog vanishing and
+    // the login screen reappearing while the request is still in flight.
     final email = await showForgotPasswordDialog(
       context,
       initialEmail: _email.text.trim(),
+      onSubmit: (address) => sendResetCode(
+        () => ref.read(authRepositoryProvider).forgotPassword(address),
+      ),
     );
-    if (email == null || email.isEmpty) return;
-    var throttled = false;
-    try {
-      await ref.read(authRepositoryProvider).forgotPassword(email);
-    } on ApiException catch (e) {
-      // The only error worth surfacing: everything else answers the same way
-      // whether or not the address has an account, and saying more here would
-      // turn this screen into an account-enumeration oracle.
-      throttled = e.code == 'OTP_RESEND_LIMIT';
-      if (throttled && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.t.verifyResendLimit)),
-        );
-      }
-    } catch (_) {}
-    if (!mounted || throttled) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(context.t.forgotSent)));
+    // Null means dismissed; anything else means a code is already on its way.
+    if (email == null || email.isEmpty || !mounted) return;
+    // Pushed in the same frame the dialog closes, so login never flashes back.
     // Straight to the code screen: the code is only valid three minutes, so
     // making the user find their own way there wastes most of the window.
     context.push('/reset-password', extra: email);

@@ -1,4 +1,21 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "prisma", "**/*spec.ts", "test_ai.ts"]
+  "compilerOptions": {
+    // Pinned, not inferred. Without it TypeScript derives the root from the
+    // common ancestor of every input file, so a single .ts anywhere outside
+    // src/ silently moves the whole build down a level — dist/src/main.js
+    // instead of dist/main.js — and the app fails to start with no error at
+    // build time. Pinning it turns that into a compile error instead.
+    "rootDir": "./src"
+  },
+  "exclude": [
+    "node_modules",
+    "test",
+    "dist",
+    "prisma",
+    // Developer tools that import from src/ but are not part of the deployable.
+    "scripts",
+    "**/*spec.ts",
+    "test_ai.ts"
+  ]
 }
