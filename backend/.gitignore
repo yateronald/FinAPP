@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 build/
+# Incremental-compilation cache (tsconfig "incremental": true). Machine-local
+# and stale the moment anyone else builds — committing it causes phantom diffs.
+*.tsbuildinfo
 
 # Environment
 .env
