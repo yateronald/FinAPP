@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/category_icons.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/money_input.dart';
 import '../../../core/widgets/form_kit.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../categories/data/category_model.dart';
@@ -77,9 +78,7 @@ class _SetBudgetSheetState extends ConsumerState<SetBudgetSheet> {
     _kind = widget.kind;
     _categoryId = widget.categoryId;
     _amount = TextEditingController(
-        text: widget.currentAmount != null
-            ? widget.currentAmount!.round().toString()
-            : '');
+        text: MoneyInput.forEditing(widget.currentAmount));
   }
 
   @override
@@ -88,8 +87,10 @@ class _SetBudgetSheetState extends ConsumerState<SetBudgetSheet> {
     super.dispose();
   }
 
-  double get _amountValue =>
-      double.tryParse(_amount.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+  /// Rounded to the stored precision so the value sent matches the value the
+  /// database keeps — otherwise the sheet would show a figure the server never
+  /// agreed to.
+  double get _amountValue => MoneyInput.round(MoneyInput.parseOr(_amount.text));
 
   double get _completion {
     final done = [
@@ -237,14 +238,14 @@ class _SetBudgetSheetState extends ConsumerState<SetBudgetSheet> {
           hint: '0',
           controller: _amount,
           required: true,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          keyboardType: MoneyInput.keyboard,
+          inputFormatters: MoneyInput.formatters,
           suffix: currency == 'XOF' ? 'FCFA' : currency,
           textStyle: const TextStyle(
               fontSize: 24, fontWeight: FontWeight.w800, height: 1.25),
           onChanged: (_) => setState(() {}),
           validator: (v) {
-            final n = double.tryParse((v ?? '').replaceAll(RegExp(r'[^0-9.]'), ''));
+            final n = MoneyInput.tryParse(v);
             return (n == null || n <= 0) ? t.invalidAmount : null;
           },
         ),

@@ -23,7 +23,7 @@ export class CreateExpenseDto {
   categoryId: string;
 
   @ApiProperty({ example: 25000 })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   amount: number;
 
@@ -77,7 +77,7 @@ export class UpdateExpenseDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   amount?: number;
 

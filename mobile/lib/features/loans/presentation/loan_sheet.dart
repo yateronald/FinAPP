@@ -6,6 +6,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/money_input.dart';
 import '../../../core/widgets/form_kit.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/loan_models.dart';
@@ -70,11 +71,11 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
     _lender = TextEditingController(text: e?.lender ?? '');
     _description = TextEditingController(text: e?.description ?? '');
     _principal = TextEditingController(
-        text: e == null ? '' : e.principalAmount.round().toString());
+        text: MoneyInput.forEditing(e?.principalAmount));
     _paid = TextEditingController(
         text: e == null || e.initialPaidAmount == 0
             ? ''
-            : e.initialPaidAmount.round().toString());
+            : MoneyInput.forEditing(e.initialPaidAmount));
     _startDate = e?.startDate ?? DateTime.now();
     _endDate = e?.expectedEndDate;
     // An existing loan keeps its own direction: its progress is derived from
@@ -93,8 +94,9 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
     super.dispose();
   }
 
-  double get _principalValue => double.tryParse(_principal.text.trim()) ?? 0;
-  double get _paidValue => double.tryParse(_paid.text.trim()) ?? 0;
+  double get _principalValue =>
+      MoneyInput.round(MoneyInput.parseOr(_principal.text));
+  double get _paidValue => MoneyInput.round(MoneyInput.parseOr(_paid.text));
 
   /// Drives the pill in the top bar. The two required fields carry most of the
   /// weight; the optional ones round it off so a complete form reads as full.
@@ -236,12 +238,12 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
           hint: '0',
           controller: _principal,
           required: true,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          keyboardType: MoneyInput.keyboard,
+          inputFormatters: MoneyInput.formatters,
           suffix: currencyLabel,
           onChanged: (_) => setState(() {}),
           validator: (v) {
-            final n = double.tryParse((v ?? '').trim()) ?? 0;
+            final n = MoneyInput.parseOr(v);
             return n <= 0 ? t.required : null;
           },
         ),
@@ -251,12 +253,12 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
           label: _lent ? t.loanAlreadyPaidLent : t.loanAlreadyPaid,
           hint: '0',
           controller: _paid,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          keyboardType: MoneyInput.keyboard,
+          inputFormatters: MoneyInput.formatters,
           suffix: currencyLabel,
           onChanged: (_) => setState(() {}),
           validator: (v) {
-            final n = double.tryParse((v ?? '').trim()) ?? 0;
+            final n = MoneyInput.parseOr(v);
             // Caught here as well as server-side so the user gets the
             // message without a round trip.
             if (n > _principalValue && _principalValue > 0) {

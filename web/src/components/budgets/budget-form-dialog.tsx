@@ -93,7 +93,10 @@ export function BudgetFormDialog({
               id="budget-amount"
               type="number"
               min="0"
-              step="1"
+              // Budgets are money like every other amount — step="1" made this
+              // the one field that refused cents.
+              step="0.01"
+              inputMode="decimal"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"

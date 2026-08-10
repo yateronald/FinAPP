@@ -5,17 +5,35 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Amounts are stored as Decimal(14, 2), so the display has to be able to carry
+ * two decimals. Rounding here used to hide the cents that had just been saved,
+ * which made decimal entry look broken even when it worked.
+ *
+ * Whole amounts stay clean — 2000 reads "2 000", not "2 000,00". Most amounts
+ * in XOF are whole, and padding all of them makes the real decimals harder to
+ * spot.
+ */
+function fractionDigits(amount: number): number {
+  return Number.isInteger(amount) ? 0 : 2;
+}
+
 export function formatCurrency(amount: number, currency = 'XOF', locale = 'fr-FR'): string {
-  // XOF has no decimals; format as integer with thin spaces.
+  const digits = fractionDigits(amount);
   const formatted = new Intl.NumberFormat(locale, {
-    maximumFractionDigits: 0,
-  }).format(Math.round(amount));
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(amount);
   const symbol = currency === 'XOF' ? 'FCFA' : currency;
   return `${formatted} ${symbol}`;
 }
 
 export function formatNumber(amount: number, locale = 'fr-FR'): string {
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(amount);
+  const digits = fractionDigits(amount);
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(amount);
 }
 
 export function formatDate(date: string | Date, locale = 'fr-FR'): string {

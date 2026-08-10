@@ -67,7 +67,7 @@ export class UpdateSettingsDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   largeExpenseThreshold?: number;
 }

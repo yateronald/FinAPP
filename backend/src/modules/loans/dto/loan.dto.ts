@@ -43,7 +43,7 @@ export class CreateLoanDto {
 
   @ApiProperty({ example: 2500000, description: 'Total amount borrowed' })
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   principalAmount!: number;
 
@@ -54,7 +54,7 @@ export class CreateLoanDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   initialPaidAmount?: number;
 
@@ -90,14 +90,14 @@ export class UpdateLoanDto {
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   principalAmount?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   initialPaidAmount?: number;
 

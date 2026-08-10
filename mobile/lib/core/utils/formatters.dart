@@ -8,22 +8,37 @@ double asDouble(dynamic v) {
 }
 
 class Money {
-  static String format(num amount, [String currency = 'XOF']) {
-    final formatted = NumberFormat.decimalPattern(dateLocale).format(amount.round());
-    final symbol = currency == 'XOF' ? 'FCFA' : currency;
-    return '$formatted $symbol';
+  /// Amounts are stored as Decimal(14, 2), so anything shown has to be able to
+  /// carry two decimals — rounding here used to hide the cents the user had
+  /// just typed, which made decimal entry look broken even when it saved fine.
+  ///
+  /// Whole amounts stay clean: 2000 reads "2 000", not "2 000,00". Most
+  /// amounts in XOF are whole, and padding every one of them with ",00" is
+  /// noise that makes the few real decimals harder to spot.
+  static bool _isWhole(num amount) => amount == amount.roundToDouble();
+
+  static String _grouped(num amount) {
+    final pattern = _isWhole(amount) ? '#,##0' : '#,##0.00';
+    return NumberFormat(pattern, dateLocale).format(amount);
   }
 
-  /// Grouped digits without a currency symbol, e.g. "421 500".
-  static String number(num amount) =>
-      NumberFormat.decimalPattern(dateLocale).format(amount.round());
+  static String format(num amount, [String currency = 'XOF']) {
+    final symbol = currency == 'XOF' ? 'FCFA' : currency;
+    return '${_grouped(amount)} $symbol';
+  }
 
+  /// Grouped digits without a currency symbol, e.g. "421 500" or "421 500,21".
+  static String number(num amount) => _grouped(amount);
+
+  /// Short form for dense rows and chart labels. Cents are deliberately
+  /// dropped above 1000 — the point of this form is scanability, and "1,2M"
+  /// is the answer the reader wants there.
   static String compact(num amount) {
     if (amount.abs() >= 1000000) {
       return '${(amount / 1000000).toStringAsFixed(amount.abs() >= 10000000 ? 0 : 1)}M';
     }
     if (amount.abs() >= 1000) return '${(amount / 1000).round()}K';
-    return amount.round().toString();
+    return _grouped(amount);
   }
 }
 

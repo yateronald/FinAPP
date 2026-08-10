@@ -4,7 +4,7 @@ import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'clas
 /** Shared by both budget kinds: how much, from when, and for how long. */
 class BudgetPeriodDto {
   @ApiProperty({ example: 3000 })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   amount: number;
 

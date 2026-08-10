@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/category_icons.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/money_input.dart';
 import '../../../core/widgets/form_kit.dart';
 import '../../categories/data/category_model.dart';
 import '../../categories/presentation/categories_screen.dart' show showCategorySheet;
@@ -85,7 +86,7 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
     super.initState();
     final e = widget.existing;
     _title = TextEditingController(text: e?.title ?? '');
-    _amount = TextEditingController(text: e != null ? e.amount.round().toString() : '');
+    _amount = TextEditingController(text: MoneyInput.forEditing(e?.amount));
     _note = TextEditingController(text: e?.description ?? '');
     _date = e?.date ?? DateTime.now();
     _categoryId = e?.categoryId;
@@ -135,7 +136,9 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
     final input = TransactionInput(
       title: _title.text.trim(),
       categoryId: _categoryId!,
-      amount: double.parse(_amount.text.replaceAll(RegExp(r'[^0-9.]'), '')),
+      // Rounded to the stored precision: the field caps at two decimals, so
+      // this only ever normalises, never surprises.
+      amount: MoneyInput.round(MoneyInput.parseOr(_amount.text)),
       date: _date,
       description: _note.text.trim(),
       // Guarded above: ticked always means a loan is selected by now.
@@ -176,8 +179,7 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
   /// Top-bar pill: the three answers that make a transaction complete.
   double get _completion {
     final done = [
-      double.tryParse(_amount.text.replaceAll(RegExp(r'[^0-9.]'), '')) != null &&
-          (double.tryParse(_amount.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0) > 0,
+      (MoneyInput.tryParse(_amount.text) ?? 0) > 0,
       _title.text.trim().isNotEmpty,
       _categoryId != null,
     ].where((e) => e).length;
@@ -221,8 +223,8 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
           hint: '0',
           controller: _amount,
           required: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+          keyboardType: MoneyInput.keyboard,
+          inputFormatters: MoneyInput.formatters,
           suffix: 'FCFA',
           textStyle: TextStyle(
             fontSize: 26,
@@ -232,7 +234,7 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
           ),
           onChanged: (_) => setState(() {}),
           validator: (v) {
-            final n = double.tryParse((v ?? '').replaceAll(RegExp(r'[^0-9.]'), ''));
+            final n = MoneyInput.tryParse(v);
             if (n == null || n <= 0) return t.invalidAmount;
             return null;
           },

@@ -32,7 +32,7 @@ export class CreateIncomeDto {
   categoryId: string;
 
   @ApiProperty({ example: 1000000 })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   amount: number;
 
@@ -75,7 +75,7 @@ export class UpdateIncomeDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   amount?: number;
 
