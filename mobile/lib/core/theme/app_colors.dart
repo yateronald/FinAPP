@@ -61,6 +61,15 @@ class AppColors {
     colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
   );
 
+  /// For figures that are an asset rather than a cost — money lent out and
+  /// still owed to the user. Same weight as the brand gradient so the two read
+  /// as siblings, not as a warning.
+  static const LinearGradient successGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF22C55E), Color(0xFF15803D)],
+  );
+
   static Color hexToColor(String? hex, [Color fallback = primaryBright]) {
     if (hex == null || hex.isEmpty) return fallback;
     var value = hex.replaceAll('#', '');

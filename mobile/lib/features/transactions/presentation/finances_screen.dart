@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/i18n/app_text.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/responsive.dart';
 import '../../../core/utils/category_icons.dart';
 import '../../../core/utils/formatters.dart';
 import '../../ai/presentation/ai_analytics_widget.dart';
@@ -16,6 +17,7 @@ import '../data/transaction_models.dart';
 import '../providers/finance_filters.dart';
 import '../providers/transactions_provider.dart';
 import 'add_transaction_sheet.dart';
+import 'category_detail_sheet.dart';
 import 'period_picker.dart';
 
 class FinancesScreen extends ConsumerStatefulWidget {
@@ -235,7 +237,15 @@ class _FinanceTab extends ConsumerWidget {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _CategoryStrip(slices: o.distribution, iconOf: iconOf, currency: currency),
+                      _CategoryStrip(
+                          slices: o.distribution,
+                          iconOf: iconOf,
+                          currency: currency,
+                          type: type,
+                          period: period,
+                          periodTotal: o.distribution
+                              .fold<double>(0, (sum, e) => sum + e.amount),
+                        ),
                       const SizedBox(height: 20),
                       _DistributionDonut(slices: o.distribution, currency: currency),
                       const SizedBox(height: 16),
@@ -433,11 +443,27 @@ class _CategoryStrip extends StatelessWidget {
   final List<CategorySlice> slices;
   final Map<String, String?> iconOf;
   final String currency;
-  const _CategoryStrip({required this.slices, required this.iconOf, required this.currency});
+  final TxType type;
+  final FinancePeriod period;
+
+  /// Whole-period total, so the detail sheet can show each category's share.
+  final double periodTotal;
+
+  const _CategoryStrip({
+    required this.slices,
+    required this.iconOf,
+    required this.currency,
+    required this.type,
+    required this.period,
+    required this.periodTotal,
+  });
   @override
   Widget build(BuildContext context) {
+    final compact = context.useCompactLayout;
+    final cardW = compact ? 124.0 : (context.isTablet ? 168.0 : 138.0);
+
     return SizedBox(
-      height: 138,
+      height: cardW,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.zero,
@@ -445,9 +471,20 @@ class _CategoryStrip extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (_, i) {
           final s = slices[i];
-          return Container(
-            width: 138,
-            padding: const EdgeInsets.all(14),
+          return _Tappable(
+            onTap: () => showCategoryDetailSheet(
+              context,
+              type: type,
+              categoryId: s.categoryId,
+              categoryName: s.name,
+              color: s.color,
+              icon: iconOf[s.categoryId],
+              period: period,
+              periodTotal: periodTotal,
+            ),
+            child: Container(
+            width: cardW,
+            padding: EdgeInsets.all(compact ? 12 : 14),
             decoration: BoxDecoration(
               color: context.colors.surface,
               borderRadius: BorderRadius.circular(18),
@@ -498,6 +535,7 @@ class _CategoryStrip extends StatelessWidget {
                   ],
                 ),
               ],
+            ),
             ),
           );
         },
@@ -1083,6 +1121,24 @@ class _CategorySuggestions extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Card-shaped tap target: the ink ripple has to follow the card's corners,
+/// which a bare InkWell around a decorated Container does not do.
+class _Tappable extends StatelessWidget {
+  const _Tappable({required this.onTap, required this.child});
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(onTap: onTap, child: child),
     );
   }
 }

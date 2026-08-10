@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CategoryType, NotificationType, Prisma } from '@prisma/client';
+import { CategoryType, LoanDirection, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { BudgetEngineService } from '../budgets/budget-engine.service';
@@ -174,7 +174,9 @@ export class ExpensesService {
     await this.assertCategory(userId, dto.categoryId);
     // Ownership is re-checked server-side: a loanId from the client is never
     // trusted, or one user could credit payments against another's loan.
-    if (dto.loanId) await this.loans.assertPayable(userId, dto.loanId);
+    if (dto.loanId) {
+      await this.loans.assertPayable(userId, dto.loanId, LoanDirection.BORROWED);
+    }
     const date = new Date(dto.date);
     const expense = await this.prisma.expense.create({
       data: {
@@ -284,7 +286,9 @@ export class ExpensesService {
   async update(userId: string, id: string, dto: UpdateExpenseDto) {
     await this.findOne(userId, id);
     if (dto.categoryId) await this.assertCategory(userId, dto.categoryId);
-    if (dto.loanId) await this.loans.assertPayable(userId, dto.loanId);
+    if (dto.loanId) {
+      await this.loans.assertPayable(userId, dto.loanId, LoanDirection.BORROWED);
+    }
     const expense = await this.prisma.expense.update({
       where: { id },
       data: {

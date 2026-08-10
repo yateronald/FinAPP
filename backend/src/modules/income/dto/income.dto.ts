@@ -13,6 +13,15 @@ import {
 } from 'class-validator';
 
 export class CreateIncomeDto {
+  @ApiPropertyOptional({
+    description:
+      'Set when this income is someone repaying a loan you granted. The loan ' +
+      'must be one of yours and must be a LENT loan.',
+  })
+  @IsOptional()
+  @IsString()
+  loanId?: string;
+
   @ApiProperty({ example: 'Salary - July' })
   @IsString()
   @MaxLength(120)
@@ -44,6 +53,15 @@ export class CreateIncomeDto {
 }
 
 export class UpdateIncomeDto {
+  @ApiPropertyOptional({
+    description:
+      'Set when this income is someone repaying a loan you granted. The loan ' +
+      'must be one of yours and must be a LENT loan.',
+  })
+  @IsOptional()
+  @IsString()
+  loanId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

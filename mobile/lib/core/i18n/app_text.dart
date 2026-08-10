@@ -135,6 +135,101 @@ class AppText {
         'a plain expense.',
   );
 
+  // ------------------------------------------------- Loans: money lent out
+  // A lent loan is the mirror image of a borrowed one, so every user-facing
+  // string has a counterpart here rather than being patched at the call site
+  // — "Prêteur" on money you granted someone would read backwards.
+  String get loanTabBorrowed => _s('Emprunts', 'Borrowed');
+  String get loanTabLent => _s('Prêts accordés', 'Lent out');
+  String get titleLoansLent => _s('Argent prêté', 'Money lent');
+  String get loanNewLent => _s('Nouveau prêt accordé', 'New loan granted');
+  String get loanEditLent => _s('Modifier le prêt accordé', 'Edit loan granted');
+  String get loanNameHintLent => _s('Ex. Prêt à Jean', 'e.g. Loan to Jean');
+  String get loanBorrower => _s('Emprunteur (optionnel)', 'Borrower (optional)');
+  String get loanBorrowerHint =>
+      _s('Ex. Jean, un collègue…', 'e.g. Jean, a colleague…');
+  String get loanDescriptionHintLent =>
+      _s('Ex. Motif du prêt, échéance convenue…', 'e.g. Reason, agreed deadline…');
+  String get loanPrincipalLent => _s('Montant total prêté', 'Total amount lent');
+  String get loanAlreadyPaidLent => _s('Déjà récupéré', 'Already recovered');
+  String get loanAlreadyPaidHelpLent => _s(
+    'Si une partie vous a déjà été remboursée avant d’utiliser Fynexa, '
+        'indiquez le montant total ici pour un suivi exact.',
+    'If part of it was repaid to you before using Fynexa, enter the total here '
+        'so the tracking stays accurate.',
+  );
+  String get loanAlreadyPaidTooHighLent => _s(
+    'Ne peut pas dépasser le montant prêté',
+    'Cannot exceed the amount lent',
+  );
+  String get loanCreateActionLent => _s('Enregistrer le prêt', 'Save the loan');
+  String get loanSaveActionLent => _s('Enregistrer les modifications', 'Save changes');
+  String get loanRemainingLent => _s('Reste dû', 'Still owed');
+  String get loanPaidLent => _s('Récupéré', 'Recovered');
+  String get loanTotalLent => _s('Prêté', 'Lent');
+  String get loanPerMonthLent => _s('/ mois attendu', 'expected / month');
+  String get loanOverdueLent => _s('Échéance dépassée', 'Past due');
+  String get loanPaidOffLent => _s('Récupéré ✓', 'Recovered ✓');
+  String get loanEmptyTitleLent =>
+      _s('Aucun prêt accordé', 'No loans granted');
+  String get loanEmptyBodyLent => _s(
+    'Vous avez dépanné quelqu’un ? Enregistrez-le ici pour suivre ce qu’on '
+        'vous doit, et liez les revenus reçus pour une progression automatique.',
+    'Helped someone out? Record it here to track what you are owed, and link '
+        'the income you receive so progress updates automatically.',
+  );
+  String get loanCreateFirstLent => _s('Enregistrer un prêt', 'Record a loan');
+  String get loanHistoryLent =>
+      _s('Remboursements reçus', 'Repayments received');
+  String get loanNoPaymentsLent => _s(
+    'Aucun remboursement reçu. Ajoutez un revenu et cochez « On me rembourse '
+        'un prêt ».',
+    'No repayments yet. Add an income and tick “This repays a loan I granted”.',
+  );
+  String get loanDeleteBodyLent => _s(
+    'Le prêt sera supprimé, mais les revenus liés resteront dans votre '
+        'historique — ils correspondent à de l’argent réellement reçu.',
+    'The loan will be removed, but its linked income stays in your history '
+        '— it is money you really received.',
+  );
+  String get loanLentSummaryTitle => _s('Reste à recevoir', 'Still owed to you');
+
+  /// Direction picker, shown only when creating — changing the direction of a
+  /// loan that already has transactions attached would rewrite its history, so
+  /// it is fixed once saved.
+  String get loanDirectionQuestion => _s('Type de prêt', 'Loan type');
+  String get loanDirectionBorrowed => _s('J’ai emprunté', 'I borrowed');
+  String get loanDirectionBorrowedHint =>
+      _s('Je dois rembourser', 'I have to repay');
+  String get loanDirectionLent => _s('J’ai prêté', 'I lent');
+  String get loanDirectionLentHint => _s('On doit me rembourser', 'I get repaid');
+  String get loanDirectionLocked => _s(
+    'Le type ne peut pas être modifié après la création.',
+    'The type cannot be changed after creation.',
+  );
+
+  // Income → loan link
+  String get incomeIsLoanRepayment =>
+      _s('On me rembourse un prêt', 'This repays a loan I granted');
+  String get incomeChooseLoan =>
+      _s('Choisir le prêt concerné', 'Choose the loan');
+  String get incomeLoanToggleHint => _s(
+    'Activez pour imputer ce revenu à un prêt accordé',
+    'Turn on to count this income towards a loan you granted',
+  );
+  String get incomeNoLoanYet => _s(
+    'Vous n’avez enregistré aucun prêt accordé. Créez-en un pour lier ce '
+        'remboursement, ou décochez la case pour enregistrer un revenu simple.',
+    'You have not recorded any loan granted. Create one to link this '
+        'repayment, or untick the box to record a plain income.',
+  );
+  String get incomeLoanRequired => _s(
+    'Sélectionnez le prêt concerné, ou décochez « On me rembourse un prêt » '
+        'pour enregistrer un revenu simple.',
+    'Select the loan being repaid, or untick “This repays a loan I granted” '
+        'to record a plain income.',
+  );
+
   // ---------------------------------------------------- Onboarding
   String get onbSkip => _s('Passer', 'Skip');
   String get onbNext => _s('Suivant', 'Next');
@@ -392,6 +487,27 @@ class AppText {
   String get forgotSendCode => _s('Envoyer le code', 'Send the code');
   String get secureAndPrivate =>
       _s('Sécurisé et confidentiel', 'Secure and private');
+
+  /// States the dialog moves through while the request is in flight, so the
+  /// user is never left looking at a screen that seems to have done nothing.
+  String get forgotSending => _s('Envoi en cours…', 'Sending…');
+  String get forgotSentTitle => _s('Code envoyé', 'Code sent');
+  String forgotSentBody(String email) => _s(
+        'Si un compte existe pour $email, un code à 6 chiffres vient d’y être '
+            'envoyé. Il expire dans 3 minutes.',
+        'If an account exists for $email, a 6-digit code has just been sent '
+            'there. It expires in 3 minutes.',
+      );
+  String get forgotOpening =>
+      _s('Ouverture de la vérification…', 'Opening verification…');
+  String get forgotOffline => _s(
+    'Aucune connexion. Vérifiez votre réseau puis réessayez.',
+    'No connection. Check your network and try again.',
+  );
+  String forgotRetryIn(String time) => _s(
+    'Trop de demandes. Réessayez dans $time.',
+    'Too many requests. Try again in $time.',
+  );
 
   // Password reset
   String get resetHeadline =>
@@ -675,6 +791,24 @@ class AppText {
     'Budget appliqué sur $n mois',
     'Budget applied to $n month${n > 1 ? 's' : ''}',
   );
+
+  // Category detail sheet
+  String catDetailCount(int n) => _s(
+    n > 1 ? '$n opérations' : '$n opération',
+    n > 1 ? '$n transactions' : '$n transaction',
+  );
+  String get catDetailTotal => _s('Total', 'Total');
+  String catDetailShare(int percent) =>
+      _s('$percent% de la période', '$percent% of the period');
+  String get catDetailAverage => _s('Moyenne', 'Average');
+  String get catDetailLargest => _s('Plus élevée', 'Largest');
+  String get catDetailEmpty => _s(
+    'Aucune opération dans cette catégorie sur la période choisie.',
+    'No transactions in this category for the selected period.',
+  );
+  String get catDetailLoadMore => _s('Charger plus', 'Load more');
+  String get catDetailToday => _s('Aujourd’hui', 'Today');
+  String get catDetailYesterday => _s('Hier', 'Yesterday');
 
   // ---------------------------------------------------- AI
   String get aiAssistant => _s('Assistant', 'Assistant');

@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CategoryType, Prisma } from '@prisma/client';
+import { CategoryType, LoanDirection, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { DashboardService } from '../dashboard/dashboard.service';
+import { LoansService } from '../loans/loans.service';
 import { CreateIncomeDto, QueryIncomeDto, UpdateIncomeDto } from './dto/income.dto';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class IncomeService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly dashboard: DashboardService,
+    private readonly loans: LoansService,
   ) {}
 
   private pctChange(current: number, previous: number): number {
@@ -168,6 +170,11 @@ export class IncomeService {
 
   async create(userId: string, dto: CreateIncomeDto) {
     await this.assertCategory(userId, dto.categoryId);
+    // Ownership AND direction are re-checked server-side: a loanId from the
+    // client is never trusted, and an income may only settle money lent out.
+    if (dto.loanId) {
+      await this.loans.assertPayable(userId, dto.loanId, LoanDirection.LENT);
+    }
     const income = await this.prisma.income.create({
       data: {
         userId,
@@ -177,6 +184,8 @@ export class IncomeService {
         date: new Date(dto.date),
         description: dto.description,
         isRecurring: dto.isRecurring ?? false,
+        // '' means "no loan"; storing it verbatim would break the foreign key.
+        loanId: dto.loanId || null,
       },
       include: { category: true },
     });
@@ -241,8 +250,12 @@ export class IncomeService {
   }
 
   async update(userId: string, id: string, dto: UpdateIncomeDto) {
+    // Own the row first, then validate what is being written to it.
     await this.findOne(userId, id);
     if (dto.categoryId) await this.assertCategory(userId, dto.categoryId);
+    if (dto.loanId) {
+      await this.loans.assertPayable(userId, dto.loanId, LoanDirection.LENT);
+    }
     const income = await this.prisma.income.update({
       where: { id },
       data: {
@@ -252,6 +265,8 @@ export class IncomeService {
         ...(dto.date !== undefined ? { date: new Date(dto.date) } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
         ...(dto.isRecurring !== undefined ? { isRecurring: dto.isRecurring } : {}),
+        // An empty string clears the link; undefined leaves it untouched.
+        ...(dto.loanId !== undefined ? { loanId: dto.loanId || null } : {}),
       },
       include: { category: true },
     });

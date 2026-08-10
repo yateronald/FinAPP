@@ -15,6 +15,7 @@ import '../../categories/providers/categories_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 import '../data/transaction_models.dart';
 import '../data/transaction_repository.dart';
+import '../../loans/data/loan_models.dart';
 import '../../loans/presentation/loan_payment_field.dart';
 import '../../loans/providers/loans_provider.dart';
 import '../providers/transactions_provider.dart';
@@ -55,19 +56,29 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
   bool get _isEdit => widget.existing != null;
   String get _catType => widget.type == TxType.income ? 'INCOME' : 'EXPENSE';
 
-  /// Loan repayment link — expenses only. Income can never repay a loan.
+  /// Loan link. Both forms have one, pointing at opposite sides of the loan
+  /// book: an expense repays what you borrowed, an income collects what you
+  /// lent. [_loanDirection] is what keeps the two from crossing.
   bool _isLoanPayment = false;
   String? _loanId;
 
   /// Raised on a save attempt so the loan picker can flag itself. Ticking the
-  /// box without choosing a loan is an incomplete answer, not a plain expense.
+  /// box without choosing a loan is an incomplete answer, not a plain
+  /// transaction.
   bool _loanTouched = false;
 
   /// Same idea for the category, which lives outside the Form validators.
   bool _categoryTouched = false;
 
-  bool get _loanSelectionMissing =>
-      !widget.type.isIncome && _isLoanPayment && _loanId == null;
+  LoanDirection get _loanDirection =>
+      widget.type.isIncome ? LoanDirection.lent : LoanDirection.borrowed;
+
+  /// The message that belongs to this form's side of the loan book.
+  String _loanRequiredMessage(BuildContext context) => widget.type.isIncome
+      ? context.t.incomeLoanRequired
+      : context.t.expenseLoanRequired;
+
+  bool get _loanSelectionMissing => _isLoanPayment && _loanId == null;
 
   @override
   void initState() {
@@ -113,7 +124,7 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
     if (_loanSelectionMissing) {
       setState(() {
         _loanTouched = true;
-        _error = context.t.expenseLoanRequired;
+        _error = _loanRequiredMessage(context);
       });
       return;
     }
@@ -130,11 +141,7 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
       // Guarded above: ticked always means a loan is selected by now.
       // '' clears an existing link when the box is unticked while editing;
       // on create there is nothing to clear, so the field is simply omitted.
-      loanId: widget.type.isIncome
-          ? null
-          : _isLoanPayment
-              ? _loanId
-              : (_isEdit ? '' : null),
+      loanId: _isLoanPayment ? _loanId : (_isEdit ? '' : null),
     );
     try {
       final repo = ref.read(transactionRepositoryProvider);
@@ -144,8 +151,9 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
       ref.invalidate(transactionsProvider(widget.type));
       ref.invalidate(financeOverviewProvider(widget.type));
       ref.invalidate(dashboardProvider);
-      // Loan progress is derived from expenses, so it must be re-read.
-      if (!widget.type.isIncome) refreshLoansFrom(ref);
+      // Loan progress is derived from the linked transactions, so any save
+      // that touches a link — including one that clears it — invalidates it.
+      refreshLoansFrom(ref);
       if (result == WriteResult.queued) {
         await ref.read(syncEngineProvider).refreshCount();
       }
@@ -292,28 +300,28 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
           maxLength: 150,
           onChanged: (_) => setState(() {}),
         ),
-        // Expenses only — repaying a loan is never income.
-        if (!isIncome)
-          LoanPaymentField(
-            accent: accent,
-            checked: _isLoanPayment,
-            selectedLoanId: _loanId,
-            showError: _loanTouched,
-            onCheckedChanged: (v) => setState(() {
-              _isLoanPayment = v;
-              if (!v) {
-                _loanId = null;
-                // Unticking resolves the complaint either way.
-                _loanTouched = false;
-                if (_error == t.expenseLoanRequired) _error = null;
-              }
-            }),
-            onLoanSelected: (id) => setState(() {
-              _loanId = id;
+        // Present on both forms, pointed at opposite sides of the loan book.
+        LoanPaymentField(
+          accent: accent,
+          direction: _loanDirection,
+          checked: _isLoanPayment,
+          selectedLoanId: _loanId,
+          showError: _loanTouched,
+          onCheckedChanged: (v) => setState(() {
+            _isLoanPayment = v;
+            if (!v) {
+              _loanId = null;
+              // Unticking resolves the complaint either way.
               _loanTouched = false;
-              if (_error == t.expenseLoanRequired) _error = null;
-            }),
-          ),
+              if (_error == _loanRequiredMessage(context)) _error = null;
+            }
+          }),
+          onLoanSelected: (id) => setState(() {
+            _loanId = id;
+            _loanTouched = false;
+            if (_error == _loanRequiredMessage(context)) _error = null;
+          }),
+        ),
         if (_error != null) FormErrorLine(message: _error!),
       ],
     );

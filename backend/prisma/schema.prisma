@@ -78,6 +78,15 @@ enum AiProvider {
   AGENTROUTER
 }
 
+/// Which way the money went. A loan taken and a loan granted share the same
+/// shape; only the transaction type that settles them differs.
+enum LoanDirection {
+  /// Money the user borrowed and owes back.
+  BORROWED
+  /// Money the user lent out and expects back.
+  LENT
+}
+
 enum OtpPurpose {
   EMAIL_VERIFICATION
   PASSWORD_RESET
@@ -271,15 +280,21 @@ model Income {
   description   String?
   isRecurring   Boolean   @default(false) @map("is_recurring")
 
+  /// Set when this income is someone repaying a loan the user granted.
+  loanId        String?   @map("loan_id")
+
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   deletedAt     DateTime? @map("deleted_at")
 
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   category      Category  @relation(fields: [categoryId], references: [id])
+  /// Deleting the loan keeps the income: it is money that really came in.
+  loan          Loan?     @relation(fields: [loanId], references: [id], onDelete: SetNull)
 
   @@index([userId, date])
   @@index([userId, categoryId])
+  @@index([loanId])
   @@index([deletedAt])
   @@map("income")
 }
@@ -342,9 +357,12 @@ model Loan {
 
   name              String
   description       String?
+  /// The other party: the lender when BORROWED, the borrower when LENT.
   lender            String?
 
-  /// Total borrowed.
+  direction         LoanDirection @default(BORROWED)
+
+  /// Total borrowed or lent.
   principalAmount   Decimal    @db.Decimal(14, 2) @map("principal_amount")
   /// Already repaid before the loan was added to the app.
   initialPaidAmount Decimal    @default(0) @db.Decimal(14, 2) @map("initial_paid_amount")
@@ -359,8 +377,12 @@ model Loan {
   deletedAt         DateTime?  @map("deleted_at")
 
   user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Repayments the user made on a BORROWED loan.
   payments          Expense[]
+  /// Repayments the user received on a LENT loan.
+  repayments        Income[]
 
+  @@index([userId, direction, status])
   @@index([userId, status])
   @@index([deletedAt])
   @@map("loans")

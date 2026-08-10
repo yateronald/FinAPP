@@ -24,7 +24,9 @@ class Transaction {
   final String? categoryIcon;
   final Color categoryColor;
 
-  /// Set when this expense repays a loan. Always null for income.
+  /// Set when this transaction settles a loan: an expense repaying money
+  /// borrowed, or an income collecting money lent out. The loan's own
+  /// direction decides which — the server refuses the mismatched pairing.
   final String? loanId;
 
   Transaction({
@@ -57,7 +59,7 @@ class Transaction {
         cat['color'],
         type == TxType.income ? AppColors.success : AppColors.danger,
       ),
-      loanId: type == TxType.income ? null : j['loanId'] as String?,
+      loanId: j['loanId'] as String?,
     );
   }
 }

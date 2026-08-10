@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { LoanStatus } from '@prisma/client';
+import { LoanDirection, LoanStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
@@ -13,6 +13,17 @@ import {
 } from 'class-validator';
 
 export class CreateLoanDto {
+  @ApiPropertyOptional({
+    enum: LoanDirection,
+    default: LoanDirection.BORROWED,
+    description:
+      'BORROWED = money you owe, settled by an expense. LENT = money owed to ' +
+      'you, settled by an income.',
+  })
+  @IsOptional()
+  @IsEnum(LoanDirection)
+  direction?: LoanDirection;
+
   @ApiProperty({ example: 'Car loan' })
   @IsString()
   @MaxLength(80)
@@ -107,6 +118,11 @@ export class UpdateLoanDto {
 }
 
 export class ListLoansQueryDto {
+  @ApiPropertyOptional({ enum: LoanDirection })
+  @IsOptional()
+  @IsEnum(LoanDirection)
+  direction?: LoanDirection;
+
   @ApiPropertyOptional({ enum: LoanStatus })
   @IsOptional()
   @IsEnum(LoanStatus)
@@ -119,4 +135,16 @@ export class ListLoansQueryDto {
   @IsOptional()
   @IsString()
   includeClosed?: string;
+}
+
+export class SelectableLoansQueryDto {
+  @ApiPropertyOptional({
+    enum: LoanDirection,
+    default: LoanDirection.BORROWED,
+    description:
+      'Which side to offer: BORROWED for the expense form, LENT for the income form.',
+  })
+  @IsOptional()
+  @IsEnum(LoanDirection)
+  direction?: LoanDirection;
 }

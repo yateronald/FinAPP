@@ -34,8 +34,11 @@ export class AiChatService {
   private readonly ctePrelude = `
     WITH my_income AS (
       SELECT i.id, i.title, i.amount, i.date, i.description, i.is_recurring,
-             c.name AS category, c.type AS category_type
-      FROM income i JOIN categories c ON c.id = i.category_id
+             c.name AS category, c.type AS category_type,
+             l.name AS loan
+      FROM income i
+      JOIN categories c ON c.id = i.category_id
+      LEFT JOIN loans l ON l.id = i.loan_id
       WHERE i.user_id = $1 AND i.deleted_at IS NULL
     ),
     my_expenses AS (
@@ -64,9 +67,29 @@ export class AiChatService {
       WHERE ob.user_id = $1 AND ob.deleted_at IS NULL
     ),
     my_loans AS (
-      SELECT l.id, l.name, l.lender, l.description,
+      SELECT l.id, l.name, l.lender, l.description, l.direction::text AS direction,
              l.principal_amount, l.initial_paid_amount,
-             l.start_date, l.expected_end_date, l.status
+             l.start_date, l.expected_end_date, l.status,
+             /* Settled = what was already paid before tracking started, plus
+                every linked transaction on the side that settles this loan. */
+             l.initial_paid_amount + COALESCE((
+               SELECT SUM(t.amount) FROM (
+                 SELECT e.amount FROM expenses e
+                 WHERE e.loan_id = l.id AND e.user_id = $1 AND e.deleted_at IS NULL
+                 UNION ALL
+                 SELECT i.amount FROM income i
+                 WHERE i.loan_id = l.id AND i.user_id = $1 AND i.deleted_at IS NULL
+               ) t
+             ), 0) AS total_settled,
+             GREATEST(0, l.principal_amount - (l.initial_paid_amount + COALESCE((
+               SELECT SUM(t.amount) FROM (
+                 SELECT e.amount FROM expenses e
+                 WHERE e.loan_id = l.id AND e.user_id = $1 AND e.deleted_at IS NULL
+                 UNION ALL
+                 SELECT i.amount FROM income i
+                 WHERE i.loan_id = l.id AND i.user_id = $1 AND i.deleted_at IS NULL
+               ) t
+             ), 0))) AS remaining
       FROM loans l
       WHERE l.user_id = $1 AND l.deleted_at IS NULL
     ),
@@ -149,16 +172,17 @@ export class AiChatService {
           'Run a READ-ONLY PostgreSQL SELECT to answer ANY question about the user finances. ' +
           'You compose the query yourself. You may ONLY reference these already-user-scoped tables ' +
           '(never any other table): ' +
-          'my_income(id, title, amount, date, description, is_recurring, category, category_type), ' +
+          'my_income(id, title, amount, date, description, is_recurring, category, category_type, loan), ' +
           'my_expenses(id, title, amount, date, description, payment_method, tags text[], category, category_type, loan), ' +
           'my_categories(id, name, type, icon, color, is_archived), ' +
-          'my_loans(id, name, lender, description, principal_amount, initial_paid_amount, start_date, expected_end_date, status), ' +
+          'my_loans(id, name, lender, description, direction, principal_amount, initial_paid_amount, total_settled, remaining, start_date, expected_end_date, status), ' +
           'my_monthly_spend(year, month, spent, expense_count), ' +
           'my_category_month_spend(category, year, month, spent), ' +
           'my_budgets(id, amount, month, year, category, is_recurring), ' +
           'my_overall_budgets(id, amount, month, year, is_recurring), ' +
           'my_budget_status(id, category, month, year, is_recurring, budget, spent, remaining, progress, status), ' +
           'my_overall_budget_status(id, month, year, is_recurring, budget, spent, remaining, progress, status). ' +
+          'LOANS — direction splits them in two and they must never be summed together: BORROWED = money the user owes, settled by expenses; LENT = money others owe the user, settled by income. remaining is what is still outstanding on that loan. "How much do I owe" filters direction = BORROWED; "how much am I owed" filters direction = LENT. ' +
           'BUDGETS — there are TWO independent layers, never mix them up: ' +
           '(a) the OVERALL budget is one cap for the WHOLE month, and every expense of that month counts against it — use my_overall_budget_status; ' +
           '(b) CATEGORY budgets are caps per category — use my_budget_status. ' +
@@ -260,7 +284,7 @@ export class AiChatService {
 
   private readonly columns: Record<string, Set<string>> = {
     my_income: new Set([
-      'id', 'title', 'amount', 'date', 'description', 'is_recurring', 'category', 'category_type',
+      'id', 'title', 'amount', 'date', 'description', 'is_recurring', 'category', 'category_type', 'loan',
     ]),
     my_expenses: new Set([
       'id', 'title', 'amount', 'date', 'description', 'payment_method', 'tags', 'category', 'category_type', 'loan',
@@ -277,7 +301,8 @@ export class AiChatService {
     my_monthly_spend: new Set(['year', 'month', 'spent', 'expense_count']),
     my_category_month_spend: new Set(['category', 'year', 'month', 'spent']),
     my_loans: new Set([
-      'id', 'name', 'lender', 'description', 'principal_amount', 'initial_paid_amount',
+      'id', 'name', 'lender', 'description', 'direction', 'principal_amount',
+      'initial_paid_amount', 'total_settled', 'remaining',
       'start_date', 'expected_end_date', 'status',
     ]),
   };
@@ -466,15 +491,18 @@ export class AiChatService {
           "Fetch and aggregate the user's finance data to answer ANY question. You describe WHAT you want as a JSON object (no code, no SQL). " +
           'Tables (already limited to this user): ' +
           'my_expenses(amount, date, title, description, payment_method, category, category_type), ' +
-          'my_income(amount, date, title, description, is_recurring, category, category_type), ' +
+          'my_income(amount, date, title, description, is_recurring, category, category_type, loan), ' +
           'my_budgets(amount, month, year, category, is_recurring), ' +
           'my_overall_budgets(amount, month, year, is_recurring), ' +
           'my_budget_status(category, month, year, budget, spent, remaining, progress, status, is_recurring), ' +
           'my_overall_budget_status(month, year, budget, spent, remaining, progress, status, is_recurring), ' +
           'my_monthly_spend(year, month, spent, expense_count), ' +
           'my_category_month_spend(category, year, month, spent), ' +
-          'my_loans(name, lender, description, principal_amount, initial_paid_amount, start_date, expected_end_date, status), ' +
+          'my_loans(name, lender, description, direction, principal_amount, initial_paid_amount, total_settled, remaining, start_date, expected_end_date, status), ' +
           'my_categories(name, type, icon, color, is_archived). ' +
+          'LOANS split by direction and must never be summed together: BORROWED = money the user owes ' +
+          '(settled by expenses), LENT = money owed to the user (settled by income). remaining is what is ' +
+          'still outstanding. "What do I owe" filters direction = BORROWED; "what am I owed", LENT. ' +
           'BUDGETS come in TWO independent layers: my_overall_budget_status is ONE cap for the WHOLE month that every expense counts against, ' +
           'while my_budget_status holds the per-category caps. The sum of category caps is NOT the overall budget. ' +
           'Both already carry budget, spent, remaining, progress and status (ok|warning|danger|exceeded) — read them directly rather than recomputing. ' +

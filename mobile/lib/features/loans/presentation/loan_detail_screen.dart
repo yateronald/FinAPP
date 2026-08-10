@@ -25,8 +25,12 @@ class LoanDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(async.hasValue ? async.value!.loan.name : t.titleLoans,
-            style: const TextStyle(fontWeight: FontWeight.w800)),
+        title: Text(
+          async.hasValue ? async.value!.loan.name : t.titleLoans,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
         actions: [
           if (async.hasValue)
             PopupMenuButton<String>(
@@ -65,7 +69,12 @@ class LoanDetailScreen extends ConsumerWidget {
             color: AppColors.primary,
             onRefresh: () async => ref.invalidate(loanDetailProvider(loanId)),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+              padding: EdgeInsets.fromLTRB(
+                context.useCompactLayout ? 14 : 20,
+                16,
+                context.useCompactLayout ? 14 : 20,
+                40,
+              ),
               children: [
                 _ProgressHeader(loan: detail.loan, currency: currency),
                 const SizedBox(height: 16),
@@ -87,10 +96,16 @@ class LoanDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 22),
                 Row(
                   children: [
-                    Text(t.loanHistory,
+                    Expanded(
+                      child: Text(
+                        detail.loan.isLent ? t.loanHistoryLent : t.loanHistory,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                            fontSize: 14.5, fontWeight: FontWeight.w800)),
-                    const Spacer(),
+                            fontSize: 14.5, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Text(t.loanPaymentCount(detail.loan.paymentCount),
                         style: TextStyle(fontSize: 11.5, color: context.muted)),
                   ],
@@ -105,14 +120,19 @@ class LoanDetailScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: context.borderColor),
                     ),
-                    child: Text(t.loanNoPayments,
+                    child: Text(
+                        detail.loan.isLent ? t.loanNoPaymentsLent : t.loanNoPayments,
                         textAlign: TextAlign.center,
                         style:
                             TextStyle(fontSize: 12.5, height: 1.45, color: context.muted)),
                   )
                 else
                   ...detail.months.map(
-                    (m) => _MonthGroup(month: m, currency: currency),
+                    (m) => _MonthGroup(
+                      month: m,
+                      currency: currency,
+                      lent: detail.loan.isLent,
+                    ),
                   ),
               ],
             ),
@@ -130,7 +150,7 @@ class LoanDetailScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(t.loanDeleteTitle,
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-        content: Text(t.loanDeleteBody,
+        content: Text(loan.isLent ? t.loanDeleteBodyLent : t.loanDeleteBody,
             style: const TextStyle(fontSize: 13.5, height: 1.45)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
@@ -167,12 +187,15 @@ class _ProgressHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.t;
     final done = loan.isPaidOff;
+    final lent = loan.isLent;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: done
             ? const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)])
-            : AppColors.brandGradient,
+            : lent
+                ? AppColors.successGradient
+                : AppColors.brandGradient,
         borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
@@ -180,8 +203,16 @@ class _ProgressHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(done ? t.loanPaidOff : t.loanRemaining,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
+              Flexible(
+                child: Text(
+                  done
+                      ? (lent ? t.loanPaidOffLent : t.loanPaidOff)
+                      : (lent ? t.loanRemainingLent : t.loanRemaining),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                ),
+              ),
               const Spacer(),
               if (loan.isOverdue && !done)
                 Container(
@@ -190,7 +221,7 @@ class _ProgressHeader extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(t.loanOverdue,
+                  child: Text(lent ? t.loanOverdueLent : t.loanOverdue,
                       style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10,
@@ -199,10 +230,14 @@ class _ProgressHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            Money.format(done ? loan.totalPaid : loan.remaining, currency),
-            style: const TextStyle(
-                color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              Money.format(done ? loan.totalPaid : loan.remaining, currency),
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800),
+            ),
           ),
           const SizedBox(height: 16),
           ClipRRect(
@@ -218,10 +253,16 @@ class _ProgressHeader extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${Money.format(loan.totalPaid, currency)} ${t.loanPaid.toLowerCase()}',
-                style: const TextStyle(color: Colors.white70, fontSize: 11.5),
+              Flexible(
+                child: Text(
+                  '${Money.format(loan.totalPaid, currency)} '
+                  '${(lent ? t.loanPaidLent : t.loanPaid).toLowerCase()}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11.5),
+                ),
               ),
+              const SizedBox(width: 8),
               Text('${loan.progress.toStringAsFixed(0)}%',
                   style: const TextStyle(
                       color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
@@ -242,20 +283,36 @@ class _FactsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
+    final lent = loan.isLent;
+    final tone = lent ? AppColors.success : AppColors.primary;
     final facts = <(IconData, String, String)>[
-      (Icons.payments_rounded, t.loanTotal, Money.format(loan.principalAmount, currency)),
+      (
+        Icons.payments_rounded,
+        lent ? t.loanTotalLent : t.loanTotal,
+        Money.format(loan.principalAmount, currency)
+      ),
       (Icons.event_rounded, t.loanStartDate, Dates.short(loan.startDate)),
       if (loan.expectedEndDate != null)
         (Icons.flag_rounded, t.loanEndDate, Dates.short(loan.expectedEndDate!)),
       if (loan.suggestedMonthlyPayment != null)
         (
           Icons.calendar_month_rounded,
-          t.loanPerMonth,
+          lent ? t.loanPerMonthLent : t.loanPerMonth,
           Money.format(loan.suggestedMonthlyPayment!, currency)
         ),
-      if (loan.lender != null && loan.lender!.isNotEmpty)
-        (Icons.storefront_rounded, t.loanLender, loan.lender!),
+      if (loan.counterparty != null && loan.counterparty!.isNotEmpty)
+        (
+          lent ? Icons.person_rounded : Icons.storefront_rounded,
+          lent ? t.loanBorrower : t.loanLender,
+          loan.counterparty!
+        ),
     ];
+
+    // Two per row on a phone, but never narrower than ~150pt: below that the
+    // label and the value both ellipsise and the card says nothing.
+    final available = MediaQuery.of(context).size.width -
+        (context.useCompactLayout ? 38 : 50);
+    final tileWidth = available / 2 < 150 ? available : available / 2;
 
     return Wrap(
       spacing: 10,
@@ -263,7 +320,7 @@ class _FactsGrid extends StatelessWidget {
       children: [
         for (final (icon, label, value) in facts)
           Container(
-            width: (MediaQuery.of(context).size.width - 50) / 2,
+            width: tileWidth,
             constraints: const BoxConstraints(maxWidth: 260),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             decoration: BoxDecoration(
@@ -273,7 +330,7 @@ class _FactsGrid extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(icon, size: 16, color: AppColors.primary),
+                Icon(icon, size: 16, color: tone),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Column(
@@ -302,9 +359,14 @@ class _FactsGrid extends StatelessWidget {
 
 // ------------------------------------------------------- Month timeline
 class _MonthGroup extends StatelessWidget {
-  const _MonthGroup({required this.month, required this.currency});
+  const _MonthGroup({
+    required this.month,
+    required this.currency,
+    required this.lent,
+  });
   final LoanMonth month;
   final String currency;
+  final bool lent;
 
   String _label() {
     // `YYYY-MM` → "juillet 2026" / "July 2026".
@@ -324,14 +386,19 @@ class _MonthGroup extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(_label(),
-                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
+              Flexible(
+                child: Text(_label(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12.5, fontWeight: FontWeight.w800)),
+              ),
               const Spacer(),
               Text(Money.format(month.total, currency),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.primary)),
+                      color: lent ? AppColors.success : AppColors.primary)),
             ],
           ),
           const SizedBox(height: 8),
@@ -345,7 +412,11 @@ class _MonthGroup extends StatelessWidget {
               children: [
                 for (var i = 0; i < month.payments.length; i++) ...[
                   if (i > 0) Divider(height: 1, color: context.borderColor),
-                  _PaymentRow(payment: month.payments[i], currency: currency),
+                  _PaymentRow(
+                    payment: month.payments[i],
+                    currency: currency,
+                    lent: lent,
+                  ),
                 ],
               ],
             ),
@@ -357,13 +428,19 @@ class _MonthGroup extends StatelessWidget {
 }
 
 class _PaymentRow extends StatelessWidget {
-  const _PaymentRow({required this.payment, required this.currency});
+  const _PaymentRow({
+    required this.payment,
+    required this.currency,
+    required this.lent,
+  });
   final LoanPayment payment;
   final String currency;
+  final bool lent;
 
   @override
   Widget build(BuildContext context) {
-    final color = _parseColor(payment.categoryColor) ?? AppColors.primary;
+    final color = _parseColor(payment.categoryColor) ??
+        (lent ? AppColors.success : AppColors.primary);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
@@ -391,8 +468,15 @@ class _PaymentRow extends StatelessWidget {
               ],
             ),
           ),
-          Text('− ${Money.format(payment.amount, currency)}',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          // A repayment received is money in; one you made is money out.
+          Text(
+            '${lent ? '+' : '−'} ${Money.format(payment.amount, currency)}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: lent ? AppColors.success : null,
+            ),
+          ),
         ],
       ),
     );

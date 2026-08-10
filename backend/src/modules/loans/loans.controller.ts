@@ -11,7 +11,12 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { LoansService } from './loans.service';
-import { CreateLoanDto, ListLoansQueryDto, UpdateLoanDto } from './dto/loan.dto';
+import {
+  CreateLoanDto,
+  ListLoansQueryDto,
+  SelectableLoansQueryDto,
+  UpdateLoanDto,
+} from './dto/loan.dto';
 
 @ApiTags('loans')
 @ApiBearerAuth()
@@ -30,11 +35,16 @@ export class LoansController {
 
   @Get('selectable')
   @ApiOperation({
-    summary: 'Active loans a payment can be attached to',
-    description: 'Used by the expense form. An empty array means none exist yet.',
+    summary: 'Active loans a transaction can be attached to',
+    description:
+      'Defaults to BORROWED (the expense form); pass direction=LENT for the ' +
+      'income form. An empty array means none exist yet.',
   })
-  selectable(@CurrentUser('userId') userId: string) {
-    return this.loans.selectable(userId);
+  selectable(
+    @CurrentUser('userId') userId: string,
+    @Query() query: SelectableLoansQueryDto,
+  ) {
+    return this.loans.selectable(userId, query.direction);
   }
 
   @Get(':id')

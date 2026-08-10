@@ -1,3 +1,21 @@
+/// Which way the money went.
+///
+/// A loan is one model with two directions rather than two models: every field
+/// and every derived figure is identical, only who owes whom differs. The
+/// direction decides which transaction settles it — an expense repays what you
+/// borrowed, an income collects what you lent.
+enum LoanDirection {
+  borrowed,
+  lent;
+
+  static LoanDirection fromJson(dynamic v) =>
+      (v as String?) == 'LENT' ? LoanDirection.lent : LoanDirection.borrowed;
+
+  String get wire => this == LoanDirection.lent ? 'LENT' : 'BORROWED';
+
+  bool get isLent => this == LoanDirection.lent;
+}
+
 /// A loan and its repayment progress.
 ///
 /// Every derived figure (`totalPaid`, `remaining`, `progress`) is computed
@@ -6,6 +24,7 @@
 class Loan {
   final String id;
   final String name;
+  final LoanDirection direction;
   final String? description;
   final String? lender;
   final double principalAmount;
@@ -29,6 +48,7 @@ class Loan {
   const Loan({
     required this.id,
     required this.name,
+    this.direction = LoanDirection.borrowed,
     this.description,
     this.lender,
     required this.principalAmount,
@@ -48,6 +68,12 @@ class Loan {
 
   bool get isPaidOff => status == 'PAID_OFF' || remaining <= 0;
 
+  /// The other party: the lender on a borrowed loan, the borrower on a lent one.
+  /// Stored in one column — the direction is what gives it its meaning.
+  String? get counterparty => lender;
+
+  bool get isLent => direction.isLent;
+
   static double _d(dynamic v) => (v as num?)?.toDouble() ?? 0;
   static DateTime? _dt(dynamic v) =>
       v == null ? null : DateTime.tryParse(v as String)?.toLocal();
@@ -55,6 +81,7 @@ class Loan {
   factory Loan.fromJson(Map<String, dynamic> j) => Loan(
         id: j['id'] as String,
         name: j['name'] as String? ?? '',
+        direction: LoanDirection.fromJson(j['direction']),
         description: j['description'] as String?,
         lender: j['lender'] as String?,
         principalAmount: _d(j['principalAmount']),
@@ -148,6 +175,7 @@ class LoanDetail {
 class SelectableLoan {
   final String id;
   final String name;
+  final LoanDirection direction;
   final double remaining;
   final double progress;
   final double? suggestedMonthlyPayment;
@@ -155,6 +183,7 @@ class SelectableLoan {
   const SelectableLoan({
     required this.id,
     required this.name,
+    this.direction = LoanDirection.borrowed,
     required this.remaining,
     required this.progress,
     this.suggestedMonthlyPayment,
@@ -163,6 +192,7 @@ class SelectableLoan {
   factory SelectableLoan.fromJson(Map<String, dynamic> j) => SelectableLoan(
         id: j['id'] as String,
         name: j['name'] as String? ?? '',
+        direction: LoanDirection.fromJson(j['direction']),
         remaining: (j['remaining'] as num?)?.toDouble() ?? 0,
         progress: (j['progress'] as num?)?.toDouble() ?? 0,
         suggestedMonthlyPayment:

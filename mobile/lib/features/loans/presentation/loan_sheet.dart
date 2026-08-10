@@ -12,26 +12,36 @@ import '../data/loan_models.dart';
 import '../providers/loans_provider.dart';
 
 /// Create or edit a loan. Resolves true when something was saved.
-Future<bool?> showLoanSheet(BuildContext context, {Loan? existing}) {
+///
+/// [direction] seeds a new loan; on an edit it is ignored, because the loan's
+/// own direction wins and cannot be changed (see [_LoanSheetState._direction]).
+Future<bool?> showLoanSheet(
+  BuildContext context, {
+  Loan? existing,
+  LoanDirection direction = LoanDirection.borrowed,
+}) {
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => LoanSheet(existing: existing),
+    builder: (_) => LoanSheet(existing: existing, direction: direction),
   );
 }
 
 class LoanSheet extends ConsumerStatefulWidget {
-  const LoanSheet({super.key, this.existing});
+  const LoanSheet({
+    super.key,
+    this.existing,
+    this.direction = LoanDirection.borrowed,
+  });
   final Loan? existing;
+  final LoanDirection direction;
 
   @override
   ConsumerState<LoanSheet> createState() => _LoanSheetState();
 }
 
 class _LoanSheetState extends ConsumerState<LoanSheet> {
-  static const _accent = AppColors.primary;
-
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _lender;
@@ -41,10 +51,16 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
 
   late DateTime _startDate;
   DateTime? _endDate;
+  late LoanDirection _direction;
   bool _saving = false;
   String? _error;
 
   bool get _isEdit => widget.existing != null;
+  bool get _lent => _direction.isLent;
+
+  /// Green for money owed to the user, indigo for money the user owes — the
+  /// same coding as the tabs, so the sheet never looks like the wrong side.
+  Color get _accent => _lent ? AppColors.success : AppColors.primary;
 
   @override
   void initState() {
@@ -61,6 +77,10 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
             : e.initialPaidAmount.round().toString());
     _startDate = e?.startDate ?? DateTime.now();
     _endDate = e?.expectedEndDate;
+    // An existing loan keeps its own direction: its progress is derived from
+    // transactions on one side only, and flipping it would silently rewrite
+    // the history. The server has no update path for it either.
+    _direction = e?.direction ?? widget.direction;
   }
 
   @override
@@ -131,6 +151,7 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
         );
       } else {
         await repo.create(
+          direction: _direction,
           name: _name.text.trim(),
           description: _description.text.trim(),
           lender: _lender.text.trim(),
@@ -165,39 +186,53 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
 
     return FormSheetShell(
       accent: _accent,
-      icon: Icons.account_balance_wallet_rounded,
-      title: _isEdit ? t.loanEdit : t.loanNew,
+      icon: _lent
+          ? Icons.volunteer_activism_rounded
+          : Icons.account_balance_wallet_rounded,
+      title: _isEdit
+          ? (_lent ? t.loanEditLent : t.loanEdit)
+          : (_lent ? t.loanNewLent : t.loanNew),
       formKey: _formKey,
       progress: _completion,
       footer: FormPrimaryButton(
         accent: _accent,
-        label: _isEdit ? t.loanSaveAction : t.loanCreateAction,
+        label: _isEdit
+            ? (_lent ? t.loanSaveActionLent : t.loanSaveAction)
+            : (_lent ? t.loanCreateActionLent : t.loanCreateAction),
         loading: _saving,
         onPressed: _saving ? null : _save,
       ),
       children: [
+        // Offered on create only — see _direction in initState.
+        if (!_isEdit)
+          _DirectionPicker(
+            value: _direction,
+            onChanged: (d) => setState(() => _direction = d),
+          ),
         FormTextCard(
-          icon: Icons.account_balance_rounded,
+          icon: _lent
+              ? Icons.volunteer_activism_rounded
+              : Icons.account_balance_rounded,
           accent: _accent,
           label: t.loanName,
-          hint: t.loanNameHint,
+          hint: _lent ? t.loanNameHintLent : t.loanNameHint,
           controller: _name,
           required: true,
           onChanged: (_) => setState(() {}),
           validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
         ),
         FormTextCard(
-          icon: Icons.storefront_rounded,
+          icon: _lent ? Icons.person_rounded : Icons.storefront_rounded,
           accent: _accent,
-          label: t.loanLender,
-          hint: t.loanLenderHint,
+          label: _lent ? t.loanBorrower : t.loanLender,
+          hint: _lent ? t.loanBorrowerHint : t.loanLenderHint,
           controller: _lender,
           onChanged: (_) => setState(() {}),
         ),
         FormTextCard(
           icon: Icons.payments_rounded,
           accent: _accent,
-          label: t.loanPrincipal,
+          label: _lent ? t.loanPrincipalLent : t.loanPrincipal,
           hint: '0',
           controller: _principal,
           required: true,
@@ -213,7 +248,7 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
         FormTextCard(
           icon: Icons.history_rounded,
           accent: _accent,
-          label: t.loanAlreadyPaid,
+          label: _lent ? t.loanAlreadyPaidLent : t.loanAlreadyPaid,
           hint: '0',
           controller: _paid,
           keyboardType: TextInputType.number,
@@ -225,7 +260,9 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
             // Caught here as well as server-side so the user gets the
             // message without a round trip.
             if (n > _principalValue && _principalValue > 0) {
-              return context.t.loanAlreadyPaidTooHigh;
+              return _lent
+                  ? context.t.loanAlreadyPaidTooHighLent
+                  : context.t.loanAlreadyPaidTooHigh;
             }
             return null;
           },
@@ -236,7 +273,8 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
             TextSpan(
               style: TextStyle(fontSize: 12.5, height: 1.4, color: context.muted),
               children: [
-                TextSpan(text: t.loanAlreadyPaidHelp),
+                TextSpan(
+                    text: _lent ? t.loanAlreadyPaidHelpLent : t.loanAlreadyPaidHelp),
               ],
             ),
           ),
@@ -272,7 +310,7 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
           icon: Icons.description_rounded,
           accent: _accent,
           label: t.loanDescription,
-          hint: t.loanDescriptionHint,
+          hint: _lent ? t.loanDescriptionHintLent : t.loanDescriptionHint,
           controller: _description,
           maxLines: 2,
           maxLength: 150,
@@ -280,7 +318,8 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
         ),
         if (_principalValue > 0)
           _RemainingPreview(
-            label: t.loanRemaining,
+            lent: _lent,
+            label: _lent ? t.loanRemainingLent : t.loanRemaining,
             amount: Money.format(remaining.toDouble(), currency),
           ),
         if (_error != null) FormErrorLine(message: _error!),
@@ -289,9 +328,161 @@ class _LoanSheetState extends ConsumerState<LoanSheet> {
   }
 }
 
+/// Which way the money went — a two-option segmented card.
+///
+/// Shown on create only: the direction decides whether an expense or an income
+/// settles this loan, and every figure on the loan is derived from those
+/// transactions. Flipping it later would orphan the ones already recorded, so
+/// the server has no update path for it and neither does this form.
+class _DirectionPicker extends StatelessWidget {
+  const _DirectionPicker({required this.value, required this.onChanged});
+  final LoanDirection value;
+  final ValueChanged<LoanDirection> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: FormKit.cardGap),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(FormKit.cardRadius),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              t.loanDirectionQuestion,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+                color: context.muted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _DirectionOption(
+                    icon: Icons.account_balance_rounded,
+                    accent: AppColors.primary,
+                    label: t.loanDirectionBorrowed,
+                    hint: t.loanDirectionBorrowedHint,
+                    selected: !value.isLent,
+                    onTap: () => onChanged(LoanDirection.borrowed),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _DirectionOption(
+                    icon: Icons.volunteer_activism_rounded,
+                    accent: AppColors.success,
+                    label: t.loanDirectionLent,
+                    hint: t.loanDirectionLentHint,
+                    selected: value.isLent,
+                    onTap: () => onChanged(LoanDirection.lent),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DirectionOption extends StatelessWidget {
+  const _DirectionOption({
+    required this.icon,
+    required this.accent,
+    required this.label,
+    required this.hint,
+    required this.selected,
+    required this.onTap,
+  });
+  final IconData icon;
+  final Color accent;
+  final String label, hint;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: '$label. $hint',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? accent.withValues(alpha: context.isDark ? 0.18 : 0.08)
+                : context.surfaceAlt,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? accent : Colors.transparent,
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 18, color: selected ? accent : context.muted),
+                  const Spacer(),
+                  Icon(
+                    selected
+                        ? Icons.check_circle_rounded
+                        : Icons.circle_outlined,
+                    size: 16,
+                    color: selected ? accent : context.muted,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? accent : null,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                hint,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10.5, height: 1.25, color: context.muted),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Live "what will be left" summary — the one number the user is really after.
 class _RemainingPreview extends StatelessWidget {
-  const _RemainingPreview({required this.label, required this.amount});
+  const _RemainingPreview({
+    required this.lent,
+    required this.label,
+    required this.amount,
+  });
+  final bool lent;
   final String label;
   final String amount;
 
@@ -304,10 +495,11 @@ class _RemainingPreview extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(FormKit.cardRadius),
-          gradient: AppColors.heroGradient,
+          gradient: lent ? AppColors.successGradient : AppColors.heroGradient,
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.28),
+              color: (lent ? AppColors.success : AppColors.primary)
+                  .withValues(alpha: 0.28),
               blurRadius: 18,
               offset: const Offset(0, 8),
             ),
@@ -322,8 +514,10 @@ class _RemainingPreview extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.20),
                 borderRadius: BorderRadius.circular(11),
               ),
-              child: const Icon(Icons.trending_down_rounded,
-                  size: 19, color: Colors.white),
+              child: Icon(
+                  lent ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                  size: 19,
+                  color: Colors.white),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -336,12 +530,18 @@ class _RemainingPreview extends StatelessWidget {
                 ),
               ),
             ),
-            Text(
-              amount,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  amount,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
           ],

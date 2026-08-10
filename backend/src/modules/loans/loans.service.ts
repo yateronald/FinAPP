@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { LoanStatus, Prisma } from '@prisma/client';
+import { LoanDirection, LoanStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateLoanDto, ListLoansQueryDto, UpdateLoanDto } from './dto/loan.dto';
 
@@ -7,6 +7,8 @@ import { CreateLoanDto, ListLoansQueryDto, UpdateLoanDto } from './dto/loan.dto'
 export interface LoanWithProgress {
   id: string;
   name: string;
+  /** BORROWED = money the user owes; LENT = money owed to the user. */
+  direction: LoanDirection;
   description: string | null;
   lender: string | null;
   principalAmount: number;
@@ -50,6 +52,7 @@ export class LoansService {
     loan: {
       id: string;
       name: string;
+      direction: LoanDirection;
       description: string | null;
       lender: string | null;
       principalAmount: Prisma.Decimal;
@@ -82,6 +85,7 @@ export class LoansService {
     return {
       id: loan.id,
       name: loan.name,
+      direction: loan.direction,
       description: loan.description,
       lender: loan.lender,
       principalAmount: principal,
@@ -116,6 +120,7 @@ export class LoansService {
       where: {
         userId,
         deletedAt: null,
+        ...(query.direction ? { direction: query.direction } : {}),
         ...(query.status ? { status: query.status } : {}),
         ...(!query.status && !includeClosed ? { status: LoanStatus.ACTIVE } : {}),
       },
@@ -123,28 +128,41 @@ export class LoansService {
     });
     if (loans.length === 0) return [];
 
-    // One grouped query for every loan rather than N+1.
-    const sums = await this.prisma.expense.groupBy({
-      by: ['loanId'],
-      where: {
-        userId,
-        deletedAt: null,
-        loanId: { in: loans.map((l) => l.id) },
-      },
-      _sum: { amount: true },
-      _count: { _all: true },
-      _max: { date: true },
-    });
-    const byLoan = new Map(sums.map((s) => [s.loanId, s]));
+    // A borrowed loan is settled by expenses, a lent one by income. Both are
+    // grouped in a single query each rather than N+1.
+    const ids = loans.map((l) => l.id);
+    const [expenseSums, incomeSums] = await Promise.all([
+      this.prisma.expense.groupBy({
+        by: ['loanId'],
+        where: { userId, deletedAt: null, loanId: { in: ids } },
+        _sum: { amount: true },
+        _count: { _all: true },
+        _max: { date: true },
+      }),
+      this.prisma.income.groupBy({
+        by: ['loanId'],
+        where: { userId, deletedAt: null, loanId: { in: ids } },
+        _sum: { amount: true },
+        _count: { _all: true },
+        _max: { date: true },
+      }),
+    ]);
+    // Merged additively rather than by overwrite: a loan whose direction was
+    // corrected after the fact can carry rows on both sides, and dropping one
+    // would silently under-report what has been settled.
+    const byLoan = new Map<string, { total: number; count: number; last: Date | null }>();
+    for (const s of [...expenseSums, ...incomeSums]) {
+      if (!s.loanId) continue;
+      const cur = byLoan.get(s.loanId) ?? { total: 0, count: 0, last: null };
+      cur.total += this.num(s._sum.amount);
+      cur.count += s._count._all;
+      if (s._max.date && (!cur.last || s._max.date > cur.last)) cur.last = s._max.date;
+      byLoan.set(s.loanId, cur);
+    }
 
     return loans.map((l) => {
       const s = byLoan.get(l.id);
-      return this.shape(
-        l,
-        this.num(s?._sum.amount),
-        s?._count._all ?? 0,
-        s?._max.date ?? null,
-      );
+      return this.shape(l, s?.total ?? 0, s?.count ?? 0, s?.last ?? null);
     });
   }
 
@@ -153,23 +171,26 @@ export class LoansService {
   async detail(userId: string, id: string) {
     const loan = await this.getOwned(userId, id);
 
-    const payments = await this.prisma.expense.findMany({
-      where: { userId, loanId: id, deletedAt: null },
-      select: {
-        id: true,
-        title: true,
-        amount: true,
-        date: true,
-        description: true,
-        category: { select: { id: true, name: true, icon: true, color: true } },
-      },
-      orderBy: { date: 'desc' },
-    });
+    // Money owed is settled by expenses; money lent, by income.
+    const select = {
+      id: true,
+      title: true,
+      amount: true,
+      date: true,
+      description: true,
+      category: { select: { id: true, name: true, icon: true, color: true } },
+    } as const;
+    const where = { userId, loanId: id, deletedAt: null };
 
-    const totalFromExpenses = payments.reduce((a, p) => a + this.num(p.amount), 0);
+    const payments =
+      loan.direction === LoanDirection.LENT
+        ? await this.prisma.income.findMany({ where, select, orderBy: { date: 'desc' } })
+        : await this.prisma.expense.findMany({ where, select, orderBy: { date: 'desc' } });
+
+    const totalSettled = payments.reduce((a, p) => a + this.num(p.amount), 0);
     const summary = this.shape(
       loan,
-      totalFromExpenses,
+      totalSettled,
       payments.length,
       payments[0]?.date ?? null,
     );
@@ -202,10 +223,13 @@ export class LoansService {
 
   // ---------------------------------------------------------------- Create
   async create(userId: string, dto: CreateLoanDto): Promise<LoanWithProgress> {
+    const direction = dto.direction ?? LoanDirection.BORROWED;
     const initial = dto.initialPaidAmount ?? 0;
     if (initial > dto.principalAmount) {
       throw new BadRequestException(
-        'The amount already repaid cannot exceed the total borrowed.',
+        direction === LoanDirection.LENT
+          ? 'The amount already repaid to you cannot exceed the total lent.'
+          : 'The amount already repaid cannot exceed the total borrowed.',
       );
     }
     if (dto.expectedEndDate && new Date(dto.expectedEndDate) < new Date(dto.startDate)) {
@@ -216,6 +240,7 @@ export class LoansService {
       data: {
         userId,
         name: dto.name.trim(),
+        direction,
         description: dto.description?.trim() || null,
         lender: dto.lender?.trim() || null,
         principalAmount: new Prisma.Decimal(dto.principalAmount),
@@ -235,7 +260,9 @@ export class LoansService {
     const initial = dto.initialPaidAmount ?? this.num(existing.initialPaidAmount);
     if (initial > principal) {
       throw new BadRequestException(
-        'The amount already repaid cannot exceed the total borrowed.',
+        existing.direction === LoanDirection.LENT
+          ? 'The amount already repaid to you cannot exceed the total lent.'
+          : 'The amount already repaid cannot exceed the total borrowed.',
       );
     }
 
@@ -261,12 +288,16 @@ export class LoansService {
       },
     });
 
-    const agg = await this.prisma.expense.aggregate({
+    const aggArgs = {
       where: { userId, loanId: id, deletedAt: null },
       _sum: { amount: true },
       _count: { _all: true },
       _max: { date: true },
-    });
+    } as const;
+    const agg =
+      existing.direction === LoanDirection.LENT
+        ? await this.prisma.income.aggregate(aggArgs)
+        : await this.prisma.expense.aggregate(aggArgs);
     return this.shape(
       loan,
       this.num(agg._sum.amount),
@@ -277,17 +308,22 @@ export class LoansService {
 
   // ---------------------------------------------------------------- Delete
   /**
-   * Soft-deletes the loan and unlinks its payments.
+   * Soft-deletes the loan and unlinks its transactions.
    *
-   * The expenses themselves are kept: they are real money that left the
-   * account, and deleting the loan record must not rewrite the user's
-   * spending history.
+   * The expenses and income themselves are kept: they are real money that
+   * moved, and deleting the loan record must not rewrite the user's history.
+   * Both sides are unlinked regardless of direction so no row is left pointing
+   * at a deleted loan.
    */
   async remove(userId: string, id: string) {
-    await this.getOwned(userId, id);
+    const loan = await this.getOwned(userId, id);
 
-    const [unlinked] = await this.prisma.$transaction([
+    const [unlinkedExpenses, unlinkedIncome] = await this.prisma.$transaction([
       this.prisma.expense.updateMany({
+        where: { userId, loanId: id },
+        data: { loanId: null },
+      }),
+      this.prisma.income.updateMany({
         where: { userId, loanId: id },
         data: { loanId: null },
       }),
@@ -298,34 +334,61 @@ export class LoansService {
     ]);
 
     return {
-      message: 'Loan removed. Its payments were kept as ordinary expenses.',
-      unlinkedPayments: unlinked.count,
+      message:
+        loan.direction === LoanDirection.LENT
+          ? 'Loan removed. Its repayments were kept as ordinary income.'
+          : 'Loan removed. Its payments were kept as ordinary expenses.',
+      unlinkedPayments: unlinkedExpenses.count + unlinkedIncome.count,
     };
   }
 
-  /** Loans a payment can be attached to — used by the expense form. */
-  async selectable(userId: string) {
-    const loans = await this.list(userId, {});
+  /**
+   * Loans a transaction can be attached to: BORROWED for the expense form,
+   * LENT for the income form. Filtering here means the picker can never even
+   * display a loan the user is not allowed to settle from that screen.
+   */
+  async selectable(userId: string, direction: LoanDirection = LoanDirection.BORROWED) {
+    const loans = await this.list(userId, { direction });
     return loans
       .filter((l) => l.status === LoanStatus.ACTIVE)
       .map((l) => ({
         id: l.id,
         name: l.name,
+        direction: l.direction,
         remaining: l.remaining,
         progress: l.progress,
         suggestedMonthlyPayment: l.suggestedMonthlyPayment,
       }));
   }
 
-  /** Rejects a loanId that is missing, archived or owned by someone else. */
-  async assertPayable(userId: string, loanId: string) {
+  /**
+   * Ownership and direction check for a transaction claiming to settle a loan.
+   *
+   * [expected] is the direction the caller is allowed to touch: an expense
+   * repays money BORROWED, an income collects money LENT. Enforcing it here
+   * matters — a client that sent an income against a borrowed loan would
+   * silently inflate its progress, and the loan is derived entirely from these
+   * transactions.
+   */
+  async assertPayable(
+    userId: string,
+    loanId: string,
+    expected: LoanDirection = LoanDirection.BORROWED,
+  ) {
     const loan = await this.prisma.loan.findFirst({
       where: { id: loanId, userId, deletedAt: null },
-      select: { id: true, status: true },
+      select: { id: true, status: true, direction: true },
     });
     if (!loan) throw new BadRequestException('That loan does not exist.');
     if (loan.status === LoanStatus.ARCHIVED) {
       throw new BadRequestException('That loan is archived.');
+    }
+    if (loan.direction !== expected) {
+      throw new BadRequestException(
+        expected === LoanDirection.BORROWED
+          ? 'An expense can only repay a loan you took out.'
+          : 'An income can only settle money you lent out.',
+      );
     }
     return loan.id;
   }

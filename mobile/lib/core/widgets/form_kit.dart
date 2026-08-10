@@ -1116,21 +1116,34 @@ class FormPrimaryButton extends StatelessWidget {
                         color: Colors.white,
                       ),
                     )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(icon, size: 19, color: Colors.white),
-                        const SizedBox(width: 10),
-                        Text(
-                          label,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: 0.1,
+                  // The label is caller-supplied and translated, so its width
+                  // is not knowable here: a long one on a narrow phone must
+                  // shrink and then ellipsise rather than overflow the pill.
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon, size: 19, color: Colors.white),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
             ),
           ),
