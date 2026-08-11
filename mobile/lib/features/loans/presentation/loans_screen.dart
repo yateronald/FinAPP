@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/responsive.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/amount_text.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/loan_models.dart';
 import '../providers/loans_provider.dart';
@@ -266,14 +267,11 @@ class _SummaryCard extends StatelessWidget {
           Text(lent ? t.loanLentSummaryTitle : t.loanRemaining,
               style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
           const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              Money.format(remaining, currency),
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
-            ),
+          AmountText(
+            amount: remaining,
+            currency: currency,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 16),
           ClipRRect(

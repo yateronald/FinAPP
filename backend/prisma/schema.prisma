@@ -98,15 +98,15 @@ enum OtpPurpose {
 // --------------------------------------------------------------------------
 
 model User {
-  id                String    @id @default(uuid())
-  email             String    @unique
-  passwordHash      String?   @map("password_hash")
-  firstName         String?   @map("first_name")
-  lastName          String?   @map("last_name")
-  country           String?
-  avatarUrl         String?   @map("avatar_url")
-  role              Role      @default(USER)
-  emailVerified     Boolean   @default(false) @map("email_verified")
+  id            String  @id @default(uuid())
+  email         String  @unique
+  passwordHash  String? @map("password_hash")
+  firstName     String? @map("first_name")
+  lastName      String? @map("last_name")
+  country       String?
+  avatarUrl     String? @map("avatar_url")
+  role          Role    @default(USER)
+  emailVerified Boolean @default(false) @map("email_verified")
 
   /// Deadline by which an unverified account must confirm its address.
   ///
@@ -125,42 +125,43 @@ model User {
   /// Set once the streak hits the limit; sign-in is refused until it passes.
   lockedUntil         DateTime? @map("locked_until")
 
-  googleId          String?   @unique @map("google_id")
-  isActive          Boolean   @default(true) @map("is_active")
-  lastLoginAt       DateTime? @map("last_login_at")
+  googleId    String?   @unique @map("google_id")
+  isActive    Boolean   @default(true) @map("is_active")
+  lastLoginAt DateTime? @map("last_login_at")
 
   // --- Admin-managed account state ---
   /// Forces a password change on the next login (set after an admin reset).
-  mustChangePassword Boolean  @default(false) @map("must_change_password")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
   passwordChangedAt  DateTime? @map("password_changed_at")
 
   // Proof of consent. Versions are stored so that publishing a new policy can
   // re-prompt only the users who accepted an older one.
-  termsAcceptedAt    DateTime? @map("terms_accepted_at")
-  termsVersion       String?   @map("terms_version")
-  privacyVersion     String?   @map("privacy_version")
+  termsAcceptedAt DateTime? @map("terms_accepted_at")
+  termsVersion    String?   @map("terms_version")
+  privacyVersion  String?   @map("privacy_version")
   /// Who disabled the account and why (null while active).
-  disabledAt         DateTime? @map("disabled_at")
-  disabledReason     String?   @map("disabled_reason")
+  disabledAt      DateTime? @map("disabled_at")
+  disabledReason  String?   @map("disabled_reason")
 
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  deletedAt         DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
-  categories        Category[]
-  incomes           Income[]
-  expenses          Expense[]
-  budgets           MonthlyBudget[]
-  overallBudgets    OverallBudget[]
-  aiInsights        AiInsight[]
-  notifications     Notification[]
-  recurring         RecurringTransaction[]
-  refreshTokens     RefreshToken[]
-  otps              OtpCode[]
-  auditLogs         AuditLog[]
-  fcmTokens         FcmToken[]
-  loans             Loan[]
-  settings          UserSettings?
+  categories      Category[]
+  incomes         Income[]
+  expenses        Expense[]
+  budgets         MonthlyBudget[]
+  overallBudgets  OverallBudget[]
+  aiInsights      AiInsight[]
+  notifications   Notification[]
+  recurring       RecurringTransaction[]
+  refreshTokens   RefreshToken[]
+  otps            OtpCode[]
+  auditLogs       AuditLog[]
+  fcmTokens       FcmToken[]
+  loans           Loan[]
+  currencyChanges CurrencyChange[]
+  settings        UserSettings?
 
   @@index([email])
   @@index([deletedAt])
@@ -168,44 +169,44 @@ model User {
 }
 
 model UserSettings {
-  id                    String   @id @default(uuid())
-  userId                String   @unique @map("user_id")
-  language              Language @default(EN)
-  currency              String   @default("XOF")
-  theme                 Theme    @default(SYSTEM)
-  notificationsEnabled  Boolean  @default(true) @map("notifications_enabled")
-  emailNotifications    Boolean  @default(true) @map("email_notifications")
-  aiEnabled             Boolean  @default(false) @map("ai_enabled")
+  id                    String     @id @default(uuid())
+  userId                String     @unique @map("user_id")
+  language              Language   @default(EN)
+  currency              String     @default("XOF")
+  theme                 Theme      @default(SYSTEM)
+  notificationsEnabled  Boolean    @default(true) @map("notifications_enabled")
+  emailNotifications    Boolean    @default(true) @map("email_notifications")
+  aiEnabled             Boolean    @default(false) @map("ai_enabled")
   /// Timestamp and disclosure version accepted before financial data may be
   /// processed by an AI provider. `aiEnabled` alone is never proof of consent.
-  aiConsentAt           DateTime? @map("ai_consent_at")
-  aiConsentVersion      String?   @map("ai_consent_version")
+  aiConsentAt           DateTime?  @map("ai_consent_at")
+  aiConsentVersion      String?    @map("ai_consent_version")
   aiProvider            AiProvider @default(GEMINI) @map("ai_provider")
-  geminiModel           String   @default("gemini-3.5-flash") @map("gemini_model")
-  agentRouterModel      String   @default("claude-opus-4-8") @map("agentrouter_model")
-  budgetAlertThreshold  Int      @default(80) @map("budget_alert_threshold")
-  largeExpenseThreshold Decimal  @default(100000) @map("large_expense_threshold") @db.Decimal(14, 2)
+  geminiModel           String     @default("gemini-3.5-flash") @map("gemini_model")
+  agentRouterModel      String     @default("claude-opus-4-8") @map("agentrouter_model")
+  budgetAlertThreshold  Int        @default(80) @map("budget_alert_threshold")
+  largeExpenseThreshold Decimal    @default(100000) @map("large_expense_threshold") @db.Decimal(14, 2)
 
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_settings")
 }
 
 model RefreshToken {
-  id          String    @id @default(uuid())
-  userId      String    @map("user_id")
-  tokenHash   String    @map("token_hash")
-  deviceInfo  String?   @map("device_info")
-  ipAddress   String?   @map("ip_address")
-  userAgent   String?   @map("user_agent")
-  expiresAt   DateTime  @map("expires_at")
-  revokedAt   DateTime? @map("revoked_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @map("token_hash")
+  deviceInfo String?   @map("device_info")
+  ipAddress  String?   @map("ip_address")
+  userAgent  String?   @map("user_agent")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenHash])
@@ -213,22 +214,22 @@ model RefreshToken {
 }
 
 model OtpCode {
-  id          String     @id @default(uuid())
-  userId      String     @map("user_id")
-  codeHash    String     @map("code_hash")
-  purpose     OtpPurpose
-  expiresAt   DateTime   @map("expires_at")
-  consumedAt  DateTime?  @map("consumed_at")
-  attempts    Int        @default(0)
+  id         String     @id @default(uuid())
+  userId     String     @map("user_id")
+  codeHash   String     @map("code_hash")
+  purpose    OtpPurpose
+  expiresAt  DateTime   @map("expires_at")
+  consumedAt DateTime?  @map("consumed_at")
+  attempts   Int        @default(0)
 
   /// True when the user explicitly asked for another code. The hourly resend
   /// quota counts only these, so the automatic code sent at sign-up never eats
   /// into the allowance.
-  isResend    Boolean    @default(false) @map("is_resend")
+  isResend Boolean @default(false) @map("is_resend")
 
-  createdAt   DateTime   @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, purpose])
   /// Serves the rolling-window resend count.
@@ -241,24 +242,24 @@ model OtpCode {
 // --------------------------------------------------------------------------
 
 model Category {
-  id          String       @id @default(uuid())
-  userId      String       @map("user_id")
-  name        String
-  type        CategoryType
-  icon        String?
-  color       String?
-  isDefault   Boolean      @default(false) @map("is_default")
-  isArchived  Boolean      @default(false) @map("is_archived")
-  sortOrder   Int          @default(0) @map("sort_order")
+  id         String       @id @default(uuid())
+  userId     String       @map("user_id")
+  name       String
+  type       CategoryType
+  icon       String?
+  color      String?
+  isDefault  Boolean      @default(false) @map("is_default")
+  isArchived Boolean      @default(false) @map("is_archived")
+  sortOrder  Int          @default(0) @map("sort_order")
 
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  deletedAt   DateTime?    @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  incomes     Income[]
-  expenses    Expense[]
-  budgets     MonthlyBudget[]
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incomes  Income[]
+  expenses Expense[]
+  budgets  MonthlyBudget[]
 
   @@unique([userId, name, type])
   @@index([userId, type])
@@ -271,26 +272,42 @@ model Category {
 // --------------------------------------------------------------------------
 
 model Income {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  categoryId    String    @map("category_id")
-  title         String
-  amount        Decimal   @db.Decimal(14, 2)
-  date          DateTime
-  description   String?
-  isRecurring   Boolean   @default(false) @map("is_recurring")
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  categoryId  String   @map("category_id")
+  title       String
+  amount      Decimal  @db.Decimal(14, 2)
+  date        DateTime
+  description String?
+  isRecurring Boolean  @default(false) @map("is_recurring")
+
+  /// What the user actually entered, when it was not in their base currency.
+  ///
+  /// `amount` above is always the value in the base currency, which is what
+  /// every total, budget and chart sums. These three record the original so
+  /// the entry can be shown as it was typed, and so a later change of base
+  /// currency can be applied without guessing.
+  ///
+  /// The rate is frozen here at write time on purpose: a receipt from January
+  /// must not change value because rates moved in March.
+  originalAmount   Decimal?  @map("original_amount") @db.Decimal(18, 6)
+  originalCurrency String?   @map("original_currency")
+  /// amount = originalAmount * fxRate, rounded to 2dp.
+  fxRate           Decimal?  @map("fx_rate") @db.Decimal(20, 10)
+  /// When the applied rate was published upstream, for audit.
+  fxRateAt         DateTime? @map("fx_rate_at")
 
   /// Set when this income is someone repaying a loan the user granted.
-  loanId        String?   @map("loan_id")
+  loanId String? @map("loan_id")
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category      Category  @relation(fields: [categoryId], references: [id])
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id])
   /// Deleting the loan keeps the income: it is money that really came in.
-  loan          Loan?     @relation(fields: [loanId], references: [id], onDelete: SetNull)
+  loan     Loan?    @relation(fields: [loanId], references: [id], onDelete: SetNull)
 
   @@index([userId, date])
   @@index([userId, categoryId])
@@ -304,29 +321,45 @@ model Income {
 // --------------------------------------------------------------------------
 
 model Expense {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  categoryId    String    @map("category_id")
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  categoryId    String   @map("category_id")
   title         String
-  amount        Decimal   @db.Decimal(14, 2)
+  amount        Decimal  @db.Decimal(14, 2)
   date          DateTime
   description   String?
-  paymentMethod String?   @map("payment_method")
-  tags          String[]  @default([])
-  receiptUrl    String?   @map("receipt_url")
+  paymentMethod String?  @map("payment_method")
+  tags          String[] @default([])
+  receiptUrl    String?  @map("receipt_url")
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
+  /// What the user actually entered, when it was not in their base currency.
+  ///
+  /// `amount` is always the value in the base currency, which is what every
+  /// total, budget and chart sums — so adding foreign currencies changed no
+  /// aggregate query. These record the original so the entry can be shown as
+  /// typed, and so a later change of base currency needs no guesswork.
+  ///
+  /// The rate is frozen at write time on purpose: a receipt from January must
+  /// not change value because rates moved in March.
+  originalAmount   Decimal?  @map("original_amount") @db.Decimal(18, 6)
+  originalCurrency String?   @map("original_currency")
+  /// amount = originalAmount * fxRate, rounded to 2dp.
+  fxRate           Decimal?  @map("fx_rate") @db.Decimal(20, 10)
+  /// When the applied rate was published upstream, for audit.
+  fxRateAt         DateTime? @map("fx_rate_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
   // Set when this expense repays a loan. Loan progress is derived from these
   // rows rather than duplicated into a payments table, so the ledger and the
   // loan balance can never drift apart.
-  loanId        String?   @map("loan_id")
+  loanId String? @map("loan_id")
 
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category      Category  @relation(fields: [categoryId], references: [id])
-  loan          Loan?     @relation(fields: [loanId], references: [id], onDelete: SetNull)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id])
+  loan     Loan?    @relation(fields: [loanId], references: [id], onDelete: SetNull)
 
   @@index([userId, date])
   @@index([userId, categoryId])
@@ -352,35 +385,51 @@ enum LoanStatus {
 /// to this loan. A stored running total would eventually disagree with the
 /// transactions after an edit or deletion.
 model Loan {
-  id                String     @id @default(uuid())
-  userId            String     @map("user_id")
+  id     String @id @default(uuid())
+  userId String @map("user_id")
 
-  name              String
-  description       String?
+  name        String
+  description String?
   /// The other party: the lender when BORROWED, the borrower when LENT.
-  lender            String?
+  lender      String?
 
-  direction         LoanDirection @default(BORROWED)
+  direction LoanDirection @default(BORROWED)
 
   /// Total borrowed or lent.
-  principalAmount   Decimal    @db.Decimal(14, 2) @map("principal_amount")
+  principalAmount   Decimal @map("principal_amount") @db.Decimal(14, 2)
   /// Already repaid before the loan was added to the app.
-  initialPaidAmount Decimal    @default(0) @db.Decimal(14, 2) @map("initial_paid_amount")
+  initialPaidAmount Decimal @default(0) @map("initial_paid_amount") @db.Decimal(14, 2)
 
-  startDate         DateTime   @map("start_date")
-  expectedEndDate   DateTime?  @map("expected_end_date")
+  /// What the user actually entered, when it was not in their base currency.
+  ///
+  /// `amount` is always the value in the base currency, which is what every
+  /// total, budget and chart sums — so adding foreign currencies changed no
+  /// aggregate query. These record the original so the entry can be shown as
+  /// typed, and so a later change of base currency needs no guesswork.
+  ///
+  /// The rate is frozen at write time on purpose: a receipt from January must
+  /// not change value because rates moved in March.
+  originalAmount   Decimal?  @map("original_amount") @db.Decimal(18, 6)
+  originalCurrency String?   @map("original_currency")
+  /// amount = originalAmount * fxRate, rounded to 2dp.
+  fxRate           Decimal?  @map("fx_rate") @db.Decimal(20, 10)
+  /// When the applied rate was published upstream, for audit.
+  fxRateAt         DateTime? @map("fx_rate_at")
 
-  status            LoanStatus @default(ACTIVE)
+  startDate       DateTime  @map("start_date")
+  expectedEndDate DateTime? @map("expected_end_date")
 
-  createdAt         DateTime   @default(now()) @map("created_at")
-  updatedAt         DateTime   @updatedAt @map("updated_at")
-  deletedAt         DateTime?  @map("deleted_at")
+  status LoanStatus @default(ACTIVE)
 
-  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Repayments the user made on a BORROWED loan.
-  payments          Expense[]
+  payments   Expense[]
   /// Repayments the user received on a LENT loan.
-  repayments        Income[]
+  repayments Income[]
 
   @@index([userId, direction, status])
   @@index([userId, status])
@@ -399,21 +448,21 @@ model Loan {
 /// rewrite what July's history says. [seriesId] only groups the rows that were
 /// created together, for "delete the rest of the run".
 model MonthlyBudget {
-  id          String    @id @default(uuid())
-  userId      String    @map("user_id")
-  categoryId  String    @map("category_id")
-  amount      Decimal   @db.Decimal(14, 2)
-  month       Int       // 1-12
-  year        Int
-  rollover    Boolean   @default(false)
-  seriesId    String?   @map("series_id")
+  id         String  @id @default(uuid())
+  userId     String  @map("user_id")
+  categoryId String  @map("category_id")
+  amount     Decimal @db.Decimal(14, 2)
+  month      Int // 1-12
+  year       Int
+  rollover   Boolean @default(false)
+  seriesId   String? @map("series_id")
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category    Category  @relation(fields: [categoryId], references: [id])
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id])
 
   @@unique([userId, categoryId, month, year])
   @@index([userId, year, month])
@@ -424,18 +473,18 @@ model MonthlyBudget {
 /// The overall cap for a month: every expense counts against it, whatever its
 /// category. Independent of [MonthlyBudget] — a user can run either, or both.
 model OverallBudget {
-  id          String    @id @default(uuid())
-  userId      String    @map("user_id")
-  amount      Decimal   @db.Decimal(14, 2)
-  month       Int       // 1-12
-  year        Int
-  seriesId    String?   @map("series_id")
+  id       String  @id @default(uuid())
+  userId   String  @map("user_id")
+  amount   Decimal @db.Decimal(14, 2)
+  month    Int // 1-12
+  year     Int
+  seriesId String? @map("series_id")
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, month, year])
   @@index([userId, year, month])
@@ -448,25 +497,25 @@ model OverallBudget {
 // --------------------------------------------------------------------------
 
 model RecurringTransaction {
-  id            String             @id @default(uuid())
-  userId        String             @map("user_id")
-  categoryId    String             @map("category_id")
-  type          RecurringType
-  title         String
-  amount        Decimal            @db.Decimal(14, 2)
-  frequency     RecurringFrequency
-  startDate     DateTime           @map("start_date")
-  endDate       DateTime?          @map("end_date")
-  nextRunDate   DateTime           @map("next_run_date")
-  lastRunDate   DateTime?          @map("last_run_date")
-  isActive      Boolean            @default(true) @map("is_active")
-  description   String?
+  id          String             @id @default(uuid())
+  userId      String             @map("user_id")
+  categoryId  String             @map("category_id")
+  type        RecurringType
+  title       String
+  amount      Decimal            @db.Decimal(14, 2)
+  frequency   RecurringFrequency
+  startDate   DateTime           @map("start_date")
+  endDate     DateTime?          @map("end_date")
+  nextRunDate DateTime           @map("next_run_date")
+  lastRunDate DateTime?          @map("last_run_date")
+  isActive    Boolean            @default(true) @map("is_active")
+  description String?
 
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @updatedAt @map("updated_at")
-  deletedAt     DateTime?          @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isActive])
   @@index([nextRunDate])
@@ -489,9 +538,9 @@ model AiInsight {
   periodStart DateTime?     @map("period_start")
   periodEnd   DateTime?     @map("period_end")
 
-  createdAt   DateTime      @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, type])
   @@index([userId, createdAt])
@@ -503,17 +552,17 @@ model AiInsight {
 // --------------------------------------------------------------------------
 
 model Notification {
-  id          String           @id @default(uuid())
-  userId      String           @map("user_id")
-  type        NotificationType
-  title       String
-  message     String           @db.Text
-  metadata    Json?
-  isRead      Boolean          @default(false) @map("is_read")
+  id       String           @id @default(uuid())
+  userId   String           @map("user_id")
+  type     NotificationType
+  title    String
+  message  String           @db.Text
+  metadata Json?
+  isRead   Boolean          @default(false) @map("is_read")
 
-  createdAt   DateTime         @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
   @@index([userId, createdAt])
@@ -525,18 +574,18 @@ model Notification {
 // --------------------------------------------------------------------------
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  userId      String?  @map("user_id")
-  action      String
-  entity      String
-  entityId    String?  @map("entity_id")
-  metadata    Json?
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
+  id        String  @id @default(uuid())
+  userId    String? @map("user_id")
+  action    String
+  entity    String
+  entityId  String? @map("entity_id")
+  metadata  Json?
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
 
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([entity, entityId])
@@ -545,14 +594,14 @@ model AuditLog {
 }
 
 model FcmToken {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  token       String   @unique
-  deviceType  String?  @map("device_type")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  token      String   @unique
+  deviceType String?  @map("device_type")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("fcm_tokens")
@@ -569,32 +618,86 @@ model FcmToken {
 /// again — the previous design created the user up front, so a failed code
 /// permanently answered "this account already exists".
 model PendingSignup {
-  id            String    @id @default(uuid())
-  email         String    @unique
+  id           String   @id @default(uuid())
+  email        String   @unique
   /// Null for a Google sign-up, which carries no password.
-  passwordHash  String?   @map("password_hash")
-  firstName     String?   @map("first_name")
-  lastName      String?   @map("last_name")
-  country       String?
-  language      Language  @default(EN)
-  currency      String    @default("XOF")
+  passwordHash String?  @map("password_hash")
+  firstName    String?  @map("first_name")
+  lastName     String?  @map("last_name")
+  country      String?
+  language     Language @default(EN)
+  currency     String   @default("XOF")
 
   /// Set when the sign-up came through Google, so the identity survives the
   /// verification step.
-  googleId      String?   @map("google_id")
-  avatarUrl     String?   @map("avatar_url")
+  googleId  String? @map("google_id")
+  avatarUrl String? @map("avatar_url")
 
-  codeHash      String    @map("code_hash")
-  expiresAt     DateTime  @map("expires_at")
-  attempts      Int       @default(0)
+  codeHash  String   @map("code_hash")
+  expiresAt DateTime @map("expires_at")
+  attempts  Int      @default(0)
 
   /// Rolling hourly resend quota, tracked here because no user row exists yet
   /// to hang OtpCode records off.
   resendCount       Int       @default(0) @map("resend_count")
   resendWindowStart DateTime? @map("resend_window_start")
 
-  createdAt     DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([expiresAt])
   @@map("pending_signups")
+}
+
+// ----------------------------------------------------------------------------
+// Foreign exchange
+// ----------------------------------------------------------------------------
+
+/// One accepted set of rates, stored so the app never depends on the upstream
+/// provider being reachable.
+///
+/// The provider is a free, unauthenticated third party with no SLA, so it is
+/// treated as a *suggestion*: every snapshot is validated before it is written
+/// (see FxValidator), and reads are always served from here, never proxied.
+/// If the provider disappears for a week the app keeps converting on the last
+/// accepted snapshot and tells the user how old it is.
+model FxRateSnapshot {
+  id          String   @id @default(uuid())
+  /// Everything is stored against one pivot currency; cross-rates are derived.
+  /// A single pivot means N rates instead of N², and one number to audit.
+  base        String   @default("USD")
+  /// { "EUR": 0.8665, "XOF": 568.44, ... } — rates per one unit of `base`.
+  rates       Json
+  /// When the provider says these rates were published.
+  publishedAt DateTime @map("published_at")
+  /// When we accepted them.
+  fetchedAt   DateTime @default(now()) @map("fetched_at")
+  /// Which provider produced it, so a bad source can be identified later.
+  source      String
+  /// How many currencies it carried — a sudden drop signals a broken upstream.
+  rateCount   Int      @map("rate_count")
+
+  @@index([publishedAt])
+  @@index([source, publishedAt])
+  @@map("fx_rate_snapshots")
+}
+
+/// Audit trail for a change of base currency.
+///
+/// The change rewrites every stored amount, so it is recorded: what it was,
+/// what it became, the single factor applied and how many rows moved. Without
+/// this there would be no way to explain a user's totals changing.
+model CurrencyChange {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  fromCurrency  String   @map("from_currency")
+  toCurrency    String   @map("to_currency")
+  /// newAmount = oldAmount * rate.
+  rate          Decimal  @db.Decimal(20, 10)
+  rowsConverted Int      @map("rows_converted")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("currency_changes")
 }

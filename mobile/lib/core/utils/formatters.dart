@@ -30,15 +30,79 @@ class Money {
   /// Grouped digits without a currency symbol, e.g. "421 500" or "421 500,21".
   static String number(num amount) => _grouped(amount);
 
-  /// Short form for dense rows and chart labels. Cents are deliberately
-  /// dropped above 1000 — the point of this form is scanability, and "1,2M"
-  /// is the answer the reader wants there.
+  /// Short form for dense rows and chart labels.
+  ///
+  /// Prefer [AmountText] over calling this directly: it only abbreviates when
+  /// the full number genuinely does not fit, which is almost always the better
+  /// answer. This is the fallback for places with no width to measure, such as
+  /// chart axis labels.
+  ///
+  /// Below [_compactFloor] the full number is returned. Abbreviating small
+  /// amounts loses more than it saves — a 2 500 FCFA lunch rendered as "3k" is
+  /// both rounded and harder to read than "2 500".
   static String compact(num amount) {
-    if (amount.abs() >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(amount.abs() >= 10000000 ? 0 : 1)}M';
+    final abs = amount.abs();
+    if (abs < _compactFloor) return _grouped(amount);
+
+    // Largest tier first, so the shortest representation is found directly.
+    final tiers = _tiers;
+    for (var i = 0; i < tiers.length; i++) {
+      final (threshold, suffix) = tiers[i];
+      if (abs < threshold) continue;
+
+      var text = _scaleTo(amount, threshold);
+      // Rounding can push a value up into the next tier: 999 500 scales to
+      // 999.5, which renders as "1000" and must become "1 M", not "1000 k".
+      // Tiers are ordered largest first, so promoting means stepping back.
+      if (double.parse(text).abs() >= 1000 && i > 0) {
+        final promoted = tiers[i - 1];
+        text = _scaleTo(amount, promoted.$1);
+        return '${_decimalSeparator(text)} ${promoted.$2}';
+      }
+      return '${_decimalSeparator(text)} $suffix';
     }
-    if (amount.abs() >= 1000) return '${(amount / 1000).round()}K';
     return _grouped(amount);
+  }
+
+  /// One decimal below ten units ("1,2 M"), none above ("12 M") — past ten the
+  /// decimal is noise rather than information.
+  static String _scaleTo(num amount, double threshold) {
+    final scaled = amount / threshold;
+    var text =
+        scaled.abs() < 10 ? scaled.toStringAsFixed(1) : scaled.toStringAsFixed(0);
+    if (text.endsWith('.0')) text = text.substring(0, text.length - 2);
+    return text;
+  }
+
+  static String _decimalSeparator(String text) =>
+      _fr ? text.replaceAll('.', ',') : text;
+
+  /// Ordered largest first so the loop picks the shortest representation.
+  static const List<(double, String)> _tiersEn = [
+    (1e12, 'T'),
+    (1e9, 'B'),
+    (1e6, 'M'),
+    (1e3, 'k'),
+  ];
+
+  /// French uses "Md" for milliard; "B" would read as billion = 10¹².
+  static const List<(double, String)> _tiersFr = [
+    (1e12, 'Bn'),
+    (1e9, 'Md'),
+    (1e6, 'M'),
+    (1e3, 'k'),
+  ];
+
+  static bool get _fr => dateLocale.startsWith('fr');
+  static List<(double, String)> get _tiers => _fr ? _tiersFr : _tiersEn;
+
+  /// Below this, the full number is short enough to be worth showing.
+  static const double _compactFloor = 10000;
+
+  /// The compact form with its currency, e.g. "1,2 M FCFA".
+  static String compactWith(num amount, [String currency = 'XOF']) {
+    final symbol = currency == 'XOF' ? 'FCFA' : currency;
+    return '${compact(amount)} $symbol';
   }
 }
 

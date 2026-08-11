@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service';
 import { BudgetEngineService } from '../budgets/budget-engine.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { LoansService } from '../loans/loans.service';
+import { MoneyWriterService } from '../fx/money-writer.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateExpenseDto, QueryExpenseDto, UpdateExpenseDto } from './dto/expense.dto';
 
@@ -17,6 +18,7 @@ export class ExpensesService {
     private readonly dashboard: DashboardService,
     private readonly notifications: NotificationsService,
     private readonly loans: LoansService,
+    private readonly money: MoneyWriterService,
   ) {}
 
   private pctChange(current: number, previous: number): number {
@@ -178,12 +180,16 @@ export class ExpensesService {
       await this.loans.assertPayable(userId, dto.loanId, LoanDirection.BORROWED);
     }
     const date = new Date(dto.date);
+    // Converts and freezes the rate when the amount was entered in another
+    // currency. Never throws: if rates are down the amount is taken as already
+    // being in the base currency and the caller is told.
+    const money = await this.money.prepare(userId, dto.amount, dto.originalCurrency);
     const expense = await this.prisma.expense.create({
       data: {
         userId,
         categoryId: dto.categoryId,
         title: dto.title,
-        amount: dto.amount,
+        ...this.money.toColumns(money),
         date,
         description: dto.description,
         paymentMethod: dto.paymentMethod,

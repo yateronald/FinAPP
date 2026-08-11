@@ -17,6 +17,11 @@ class TransactionInput {
   /// Set when this expense repays a loan. Income never carries one.
   final String? loanId;
 
+  /// Set only when the amount was entered in something other than the user's
+  /// base currency. The server does the conversion — the client never computes
+  /// a stored value, so the ledger and the display can never disagree.
+  final String? originalCurrency;
+
   TransactionInput({
     required this.title,
     required this.categoryId,
@@ -24,6 +29,7 @@ class TransactionInput {
     required this.date,
     this.description,
     this.loanId,
+    this.originalCurrency,
   });
 
   Map<String, dynamic> toJson() => {
@@ -35,6 +41,8 @@ class TransactionInput {
         // Always sent on edit so clearing the checkbox unlinks the payment;
         // an empty string is how the API expresses "no loan".
         if (loanId != null) 'loanId': loanId,
+        if (originalCurrency != null && originalCurrency!.isNotEmpty)
+          'originalCurrency': originalCurrency,
       };
 }
 

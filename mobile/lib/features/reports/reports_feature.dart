@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/responsive.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/amount_text.dart';
 import '../auth/providers/auth_provider.dart';
 import '../categories/data/category_model.dart';
 import '../categories/providers/categories_provider.dart';
@@ -523,7 +524,7 @@ class _SummaryGrid extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(Money.format(v, cur),
+            child: AmountText(amount: v, currency: cur,
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
           ),
           const SizedBox(height: 4),
@@ -821,7 +822,7 @@ class _CategoryCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                     ),
-                    Text(Money.format(s.amount, currency),
+                    AmountText(amount: s.amount, currency: currency,
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                   ],
                 ),

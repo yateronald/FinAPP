@@ -24,7 +24,9 @@ describe('LoansService.assertPayable', () => {
       loan: { findFirst: jest.fn().mockResolvedValue(found) },
     };
     return {
-      service: new LoansService(prisma as never),
+      // The money writer plays no part in assertPayable, so a stub keeps the
+      // test on the direction rule it is actually about.
+      service: new LoansService(prisma as never, {} as never),
       prisma,
     };
   }

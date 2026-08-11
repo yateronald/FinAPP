@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { LoanDirection, LoanStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { MoneyWriterService } from '../fx/money-writer.service';
 import { CreateLoanDto, ListLoansQueryDto, UpdateLoanDto } from './dto/loan.dto';
 
 /** A loan plus everything derived from its linked expenses. */
@@ -33,7 +34,10 @@ export interface LoanWithProgress {
 
 @Injectable()
 export class LoansService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly money: MoneyWriterService,
+  ) {}
 
   private num(v: Prisma.Decimal | number | null | undefined): number {
     return v == null ? 0 : Number(v);
@@ -236,14 +240,22 @@ export class LoansService {
       throw new BadRequestException('The end date must be after the start date.');
     }
 
+    // A loan can be taken out in another currency; the principal is converted
+    // and the rate frozen, so its progress stays comparable with every other
+    // figure in the app.
+    const money = await this.money.prepare(userId, dto.principalAmount, dto.originalCurrency);
     const loan = await this.prisma.loan.create({
       data: {
         userId,
         name: dto.name.trim(),
         direction,
+        originalAmount: money.originalAmount,
+        originalCurrency: money.originalCurrency,
+        fxRate: money.fxRate,
+        fxRateAt: money.fxRateAt,
         description: dto.description?.trim() || null,
         lender: dto.lender?.trim() || null,
-        principalAmount: new Prisma.Decimal(dto.principalAmount),
+        principalAmount: new Prisma.Decimal(money.amount),
         initialPaidAmount: new Prisma.Decimal(initial),
         startDate: new Date(dto.startDate),
         expectedEndDate: dto.expectedEndDate ? new Date(dto.expectedEndDate) : null,

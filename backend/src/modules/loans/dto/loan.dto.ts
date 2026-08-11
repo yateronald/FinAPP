@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsNumber,
   IsOptional,
+  Length,
   IsPositive,
   IsString,
   MaxLength,
@@ -46,6 +47,18 @@ export class CreateLoanDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   principalAmount!: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Currency the amount was entered in, when it is not the base currency. ' +
+      'The server converts it and freezes the rate on the row; `amount` is ' +
+      'always stored in the base currency.',
+    example: 'EUR',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(3, 5)
+  originalCurrency?: string;
 
   @ApiPropertyOptional({
     example: 500000,
@@ -93,6 +106,18 @@ export class UpdateLoanDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   principalAmount?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Currency the amount was entered in, when it is not the base currency. ' +
+      'The server converts it and freezes the rate on the row; `amount` is ' +
+      'always stored in the base currency.',
+    example: 'EUR',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(3, 5)
+  originalCurrency?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

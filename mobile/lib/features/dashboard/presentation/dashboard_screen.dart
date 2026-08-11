@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/category_icons.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/amount_text.dart';
 import '../../ai/presentation/ai_analytics_widget.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../reports/reports_feature.dart';
@@ -301,7 +302,9 @@ class _StatCard extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(Money.format(value, currency),
+            child: AmountText(
+                amount: value,
+                currency: currency,
                 style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800)),
           ),
           const SizedBox(height: 12),

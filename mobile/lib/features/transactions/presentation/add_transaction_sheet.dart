@@ -16,6 +16,8 @@ import '../../categories/providers/categories_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 import '../data/transaction_models.dart';
 import '../data/transaction_repository.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../currency/presentation/transaction_currency_field.dart';
 import '../../loans/data/loan_models.dart';
 import '../../loans/presentation/loan_payment_field.dart';
 import '../../loans/providers/loans_provider.dart';
@@ -70,6 +72,13 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
 
   /// Same idea for the category, which lives outside the Form validators.
   bool _categoryTouched = false;
+
+  /// Currency this entry was typed in. Defaults to the user's base, in which
+  /// case nothing is converted and no provenance is stored.
+  String? _currency;
+
+  String _baseCurrency(WidgetRef ref) =>
+      ref.read(authProvider).user?.currency ?? 'XOF';
 
   LoanDirection get _loanDirection =>
       widget.type.isIncome ? LoanDirection.lent : LoanDirection.borrowed;
@@ -145,6 +154,10 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
       // '' clears an existing link when the box is unticked while editing;
       // on create there is nothing to clear, so the field is simply omitted.
       loanId: _isLoanPayment ? _loanId : (_isEdit ? '' : null),
+      // Only sent when it differs from the base currency; the server converts
+      // and freezes the rate on the row.
+      originalCurrency:
+          _currency != null && _currency != _baseCurrency(ref) ? _currency : null,
     );
     try {
       final repo = ref.read(transactionRepositoryProvider);
@@ -301,6 +314,13 @@ class _TransactionSheetState extends ConsumerState<TransactionSheet> {
           maxLines: 2,
           maxLength: 150,
           onChanged: (_) => setState(() {}),
+        ),
+        TransactionCurrencyField(
+          accent: accent,
+          baseCurrency: _baseCurrency(ref),
+          selected: _currency ?? _baseCurrency(ref),
+          amount: MoneyInput.tryParse(_amount.text) ?? 0,
+          onChanged: (code) => setState(() => _currency = code),
         ),
         // Present on both forms, pointed at opposite sides of the loan book.
         LoanPaymentField(

@@ -10,6 +10,9 @@
 import { LoanDirection } from '@prisma/client';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { LoansService } from '../src/modules/loans/loans.service';
+import { MoneyWriterService } from '../src/modules/fx/money-writer.service';
+import { FxService } from '../src/modules/fx/fx.service';
+import { ExchangeRateFunProvider } from '../src/modules/fx/providers/exchangerate-fun.provider';
 
 const ok = (label: string, pass: boolean, extra = '') =>
   console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${label}${extra ? ` — ${extra}` : ''}`);
@@ -17,7 +20,8 @@ const ok = (label: string, pass: boolean, extra = '') =>
 async function main() {
   const prisma = new PrismaService();
   await prisma.$connect();
-  const loans = new LoansService(prisma);
+  const fx = new FxService(prisma as never, new ExchangeRateFunProvider());
+  const loans = new LoansService(prisma, new MoneyWriterService(prisma as never, fx));
 
   const user = await prisma.user.findFirst({ select: { id: true } });
   if (!user) throw new Error('no user in the dev database');

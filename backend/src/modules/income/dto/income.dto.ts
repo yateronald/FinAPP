@@ -6,6 +6,7 @@ import {
   IsInt,
   IsNumber,
   IsOptional,
+  Length,
   IsString,
   Max,
   MaxLength,
@@ -35,6 +36,18 @@ export class CreateIncomeDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   amount: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Currency the amount was entered in, when it is not the base currency. ' +
+      'The server converts it and freezes the rate on the row; `amount` is ' +
+      'always stored in the base currency.',
+    example: 'EUR',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(3, 5)
+  originalCurrency?: string;
 
   @ApiProperty({ example: '2026-07-01' })
   @IsDateString()
@@ -78,6 +91,18 @@ export class UpdateIncomeDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   amount?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Currency the amount was entered in, when it is not the base currency. ' +
+      'The server converts it and freezes the rate on the row; `amount` is ' +
+      'always stored in the base currency.',
+    example: 'EUR',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(3, 5)
+  originalCurrency?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

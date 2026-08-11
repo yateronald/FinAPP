@@ -4,6 +4,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { LoansService } from '../loans/loans.service';
+import { MoneyWriterService } from '../fx/money-writer.service';
 import { CreateIncomeDto, QueryIncomeDto, UpdateIncomeDto } from './dto/income.dto';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class IncomeService {
     private readonly audit: AuditService,
     private readonly dashboard: DashboardService,
     private readonly loans: LoansService,
+    private readonly money: MoneyWriterService,
   ) {}
 
   private pctChange(current: number, previous: number): number {
@@ -175,12 +177,15 @@ export class IncomeService {
     if (dto.loanId) {
       await this.loans.assertPayable(userId, dto.loanId, LoanDirection.LENT);
     }
+    // Converts and freezes the rate when entered in another currency; falls
+    // back to the amount as typed if rates are unavailable.
+    const money = await this.money.prepare(userId, dto.amount, dto.originalCurrency);
     const income = await this.prisma.income.create({
       data: {
         userId,
         categoryId: dto.categoryId,
         title: dto.title,
-        amount: dto.amount,
+        ...this.money.toColumns(money),
         date: new Date(dto.date),
         description: dto.description,
         isRecurring: dto.isRecurring ?? false,
@@ -190,7 +195,9 @@ export class IncomeService {
       include: { category: true },
     });
     await this.audit.log({ userId, action: 'INCOME_CREATED', entity: 'Income', entityId: income.id });
-    return income;
+    return money.fallbackReason
+      ? { ...income, fxFallback: money.fallbackReason, baseCurrency: money.baseCurrency }
+      : income;
   }
 
   async list(userId: string, query: QueryIncomeDto) {

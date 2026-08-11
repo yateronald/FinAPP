@@ -479,6 +479,68 @@ class AppText {
     'We will never share your e-mail with third parties.',
   );
   String get forgotSendCode => _s('Envoyer le code', 'Send the code');
+
+  // ------------------------------------------------------------- Currency
+  String get currencyPickTitle => _s('Choisir la devise', 'Choose currency');
+  String get currencySearchHint =>
+      _s('Rechercher une devise…', 'Search a currency…');
+  String get currencyCommon => _s('Courantes', 'Common');
+  String get currencyAll => _s('Toutes les devises', 'All currencies');
+  String get currencyNoRate => _s(
+    'Taux indisponible — sera enregistré sans conversion',
+    'No rate available — will be recorded unconverted',
+  );
+  String get currencyDefaultTitle => _s('Votre devise', 'Your currency');
+  String get currencyDefaultBody => _s(
+    'Tous vos totaux, budgets et rapports seront affichés dans cette devise. '
+        'Vous pourrez la changer plus tard.',
+    'All your totals, budgets and reports will be shown in this currency. '
+        'You can change it later.',
+  );
+  String get currencyOfTransaction => _s('Devise', 'Currency');
+  String currencyConvertedTo(String amount) =>
+      _s('≈ $amount une fois converti', '≈ $amount once converted');
+  String currencyRateLine(String rate) => _s('Taux : $rate', 'Rate: $rate');
+  String currencyStaleWarning(String age) => _s(
+    'Taux datant de $age. Le montant converti peut être légèrement décalé.',
+    'Rates are $age old. The converted amount may be slightly off.',
+  );
+  String get currencyUnavailableWarning => _s(
+    'Taux de change indisponibles. Le montant sera enregistré tel quel, dans '
+        'votre devise par défaut.',
+    'Exchange rates are unavailable. The amount will be recorded as entered, '
+        'in your default currency.',
+  );
+  String currencyAgeHours(int h) => _s('$h h', '${h}h');
+  String currencyAgeMinutes(int m) => _s('$m min', '$m min');
+
+  // Changing the base currency
+  String get currencyChangeTitle =>
+      _s('Changer de devise principale', 'Change main currency');
+  String currencyChangeBody(String from, String to, int rows) => _s(
+    'Vos $rows enregistrements seront convertis de $from vers $to.',
+    'Your $rows records will be converted from $from to $to.',
+  );
+  String get currencyChangeIrreversible => _s(
+    'Attention : la conversion arrondit chaque montant. Revenir à votre devise '
+        'précédente ne redonnera pas exactement les mêmes valeurs, car le taux '
+        'aura changé entre-temps.',
+    'Careful: converting rounds every amount. Switching back will not restore '
+        'exactly the same values, because the rate will have moved.',
+  );
+  String currencyChangeRepeat(int n) => _s(
+    'Vous avez déjà changé de devise $n fois. Chaque changement arrondit à '
+        'nouveau, et ces écarts s’accumulent.',
+    'You have already changed currency $n times. Each change rounds again, and '
+        'those differences add up.',
+  );
+  String currencyChangeExample(String before, String after) =>
+      _s('Exemple : $before deviendra $after', 'Example: $before becomes $after');
+  String get currencyChangeConfirm => _s('Convertir', 'Convert');
+  String currencyChangeDone(int rows) => _s(
+    '$rows enregistrements convertis.',
+    '$rows records converted.',
+  );
   String get secureAndPrivate =>
       _s('Sécurisé et confidentiel', 'Secure and private');
 

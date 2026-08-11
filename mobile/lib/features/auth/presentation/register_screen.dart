@@ -10,6 +10,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/responsive.dart';
 import '../data/user_model.dart';
+import '../../currency/presentation/currency_picker_sheet.dart';
+import '../../currency/providers/currency_provider.dart';
 import '../providers/auth_provider.dart';
 import 'auth_widgets.dart';
 import 'google_auth_button.dart';
@@ -120,13 +122,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _pickCurrency() async {
-    final result = await showModalBottomSheet<(String, String)>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _CurrencySheet(selected: _currency.$1),
+    // The full ISO catalogue rather than a shortlist. `convertibleOnly` because
+    // this is the account's base currency: everything is expressed in it, so a
+    // currency the rate feed cannot price would leave the account unable to
+    // convert anything at all.
+    final code = await showCurrencyPicker(
+      context,
+      selected: _currency.$1,
+      convertibleOnly: true,
+      title: context.t.currencyDefaultTitle,
     );
-    if (result != null) setState(() => _currency = result);
+    if (code == null) return;
+    final match = ref
+        .read(currenciesProvider)
+        .value
+        ?.where((c) => c.code == code)
+        .firstOrNull;
+    setState(() => _currency = (code, match == null ? code : '${match.display} – ${match.name}'));
   }
 
   @override
@@ -935,71 +947,3 @@ class _CountrySheetState extends State<_CountrySheet> {
   }
 }
 
-class _CurrencySheet extends StatelessWidget {
-  final String selected;
-  const _CurrencySheet({required this.selected});
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.7,
-      ),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      padding: EdgeInsets.only(
-        top: 12,
-        bottom: 12 + MediaQuery.of(context).padding.bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 44,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.borderColor,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                t.preferredCurrency,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-          Flexible(
-            child: ListView(
-              shrinkWrap: true,
-              children: kCurrencies.map((c) {
-                final sel = c.$1 == selected;
-                return ListTile(
-                  title: Text(
-                    c.$2,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  trailing: sel
-                      ? const Icon(
-                          Icons.check_circle_rounded,
-                          color: AppColors.primary,
-                        )
-                      : null,
-                  onTap: () => Navigator.pop(context, c),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
