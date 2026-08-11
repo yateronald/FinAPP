@@ -41,11 +41,42 @@ export class FxService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    // Warm the cache from the database, but never block startup on the network.
-    // A failure here must not stop the API from booting.
-    this.loadLatest().catch((e) =>
-      this.logger.warn(`Could not load FX rates at startup: ${e.message}`),
-    );
+    // Detached on purpose: warming rates must never block the API from booting,
+    // and a provider outage at deploy time must not turn into a failed deploy.
+    void this.warmUp();
+  }
+
+  /**
+   * Makes sure rates exist as soon as the process is up.
+   *
+   * The hourly cron alone is not enough. On a fresh deployment the snapshot
+   * table is empty, and a restart at :21 would leave the app with no rates at
+   * all until :20 the next hour — 59 minutes during which every conversion
+   * reports `unavailable`. Nothing breaks, by design, but the feature is simply
+   * absent, which looks identical to it being broken.
+   *
+   * So: read what we have, and fetch immediately if it is missing or already
+   * stale. Steady-state restarts find fresh rates and make no outbound call.
+   */
+  private async warmUp() {
+    try {
+      const existing = await this.loadLatest();
+      if (existing) {
+        const { quality } = this.qualityOf(existing.publishedAt);
+        if (quality === 'live') {
+          this.logger.log('FX rates loaded from the last stored snapshot');
+          return;
+        }
+        this.logger.log('Stored FX rates are stale — refreshing at startup');
+      } else {
+        this.logger.log('No FX rates stored yet — fetching at startup');
+      }
+      await this.refresh();
+    } catch (e: any) {
+      // The hourly cron will try again; conversions report `unavailable` until
+      // then and every caller already handles that.
+      this.logger.warn(`FX warm-up failed, will retry on schedule: ${e.message}`);
+    }
   }
 
   // ----------------------------------------------------------------- refresh
